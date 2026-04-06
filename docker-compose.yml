@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: lostandfound-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # This tells Docker to ping the DB until it is fully ready
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: lostandfound-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        # The app will NOT start until the DB healthcheck passes
+        condition: service_healthy
+    ports:
+      - "${SERVER_PORT}:8080"
+    environment:
+      # Connects using the internal Docker network name 'db'
+      DB_URL: jdbc:postgresql://db:5432/${DB_NAME}?stringtype=unspecified
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      API_KEY: ${API_KEY}
+      SPRING_PROFILES_ACTIVE: dev
+    volumes:
+      - app_logs:/app/logs
+      - ./uploads:/app/uploads
+
+volumes:
+  postgres_data:
+  app_logs:
