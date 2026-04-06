@@ -7,8 +7,10 @@ You do not need to install Java or PostgreSQL locally. Everything is containeriz
 
 **Setup Steps:**
 1. **Clone the repository:**
-   `git clone <your-repo-url> && cd lostandfound-backend`
-
+   ```
+   git clone https://github.com/lostfromlight1/lostandfound.git
+   cd lostandfound
+   ```
 2. **Set up your environment variables:**
    Copy the example environment file to create your local config.
    `cp .env.example .env`
