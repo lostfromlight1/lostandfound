@@ -1,9 +1,14 @@
 package com.lostandfound.app.model;
 
 import jakarta.persistence.*;
+import java.util.Collection;
+import java.util.List;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.SQLRestriction;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 
 @Data
 @Entity
@@ -13,7 +18,7 @@ import org.hibernate.annotations.SQLRestriction;
 @Table(name = "users")
 @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 @SQLRestriction("is_active = true")
-public class User extends BaseEntity {
+public class User extends BaseEntity implements UserDetails {
 
     @Id
     @EqualsAndHashCode.Include
@@ -51,4 +56,32 @@ public class User extends BaseEntity {
      * @JoinColumn(name = "profile_image_id")
      * private Image profileImage;
      */
+
+    // --- UserDetails Methods ---
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        // Spring Security typically expects roles to be prefixed with "ROLE_"
+        return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
+    }
+
+    @Override
+    public String getUsername() {
+        return email;
+    }
+
+    @Override
+    public String getPassword() {
+        return password;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return !isLocked;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return Boolean.TRUE.equals(getActive());
+    }
 }

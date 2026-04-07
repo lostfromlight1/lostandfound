@@ -1,12 +1,12 @@
 package com.lostandfound.app.config;
 
 import com.lostandfound.app.exception.RestAccessDeniedHandler;
+import com.lostandfound.app.exception.RestAuthenticationEntryPoint;
 import com.lostandfound.app.security.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -27,9 +27,10 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-//  private final JwtAuthenticationFilter jwtAuthFilter;
-//  private final TraceIdFilter traceIdFilter;
-//  private final CustomAuthenticationEntryPoint authEntryPoint;
+  private final JwtAuthenticationFilter jwtAuthFilter;
+  private final ApiKeyFilter apiKeyFilter;
+  private final TraceIdFilter traceIdFilter;
+  private final RestAuthenticationEntryPoint authEntryPoint;
   private final RestAccessDeniedHandler accessDeniedHandler;
   private final SecurityProperties securityProperties;
 
@@ -55,27 +56,28 @@ public class SecurityConfig {
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .exceptionHandling(
             ex -> {
-//              ex.authenticationEntryPoint(authEntryPoint);
+              ex.authenticationEntryPoint(authEntryPoint);
               ex.accessDeniedHandler(accessDeniedHandler);
             })
         .authorizeHttpRequests(
             auth ->
                 auth
-                    // 1. Allow the routes defined in application.yml
                     .requestMatchers(publicRoutes)
                     .permitAll()
 
-                    // 2. Allow ALL public GET requests for articles (Search List & Raw Images)
-                    .requestMatchers(HttpMethod.GET, "/api/v1/articles/**")
-                    .permitAll()
-
-                    // 3. Everything else (including POST, PUT, DELETE to articles) requires a token
                     .anyRequest()
                     .authenticated());
 
-//    http.addFilterBefore(traceIdFilter, UsernamePasswordAuthenticationFilter.class);
-//
-//    http.addFilterAfter(jwtAuthFilter, TraceIdFilter.class);
+    // --- FILTER CHAIN ORDERING ---
+
+    // 1. Trace ID first so we can log everything
+    http.addFilterBefore(traceIdFilter, UsernamePasswordAuthenticationFilter.class);
+
+    // 2. GATEWAY GUARD: Check the X-API-KEY before anything else!
+    http.addFilterAfter(apiKeyFilter, TraceIdFilter.class);
+
+    // 3. USER AUTHENTICATION: Check the JWT token
+    http.addFilterAfter(jwtAuthFilter, ApiKeyFilter.class);
 
     return http.build();
   }
