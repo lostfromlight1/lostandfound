@@ -8,7 +8,11 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
-
+/**
+ * Think of this class as a "Security Consultant."
+ * We call it when we need to do deep logic checks, like "Does this
+ * specific user own this specific post?"
+ */
 @Slf4j
 @Component("guard")
 public class ResourceGuard {
