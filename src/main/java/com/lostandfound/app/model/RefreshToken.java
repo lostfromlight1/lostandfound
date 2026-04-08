@@ -37,7 +37,4 @@ public class RefreshToken extends BaseEntity {
     @Builder.Default
     private boolean revoked = false;
 
-    @Column(nullable = false)
-    @Builder.Default
-    private boolean active = true;
 }
