@@ -1,6 +1,7 @@
 package com.lostandfound.app.controller;
 
 import com.lostandfound.app.dto.request.AuthRequest.ChangePasswordRequest;
+import com.lostandfound.app.dto.request.AuthRequest.ConfirmPasswordResetRequest; // ADDED
 import com.lostandfound.app.dto.request.AuthRequest.LoginRequest;
 import com.lostandfound.app.dto.request.AuthRequest.RegisterRequest;
 import com.lostandfound.app.dto.response.AuthResponse;
@@ -79,5 +80,15 @@ public class AuthController {
         log.info("Received password reset request for email: {}", email);
         authService.resetPassword(email);
         return BaseResponse.success("If the email exists, a reset link has been sent.");
+    }
+
+    @PostMapping("/reset-password/confirm")
+    @CheckSecurity.Public.canRead
+    @Operation(summary = "Confirm Password Reset", description = "Verifies the reset token and updates the user's password.")
+    public ResponseEntity<BaseResponse<Void>> confirmPasswordReset(
+            @Valid @RequestBody ConfirmPasswordResetRequest request) {
+        log.info("Received password reset confirmation request");
+        authService.confirmPasswordReset(request.token(), request.newPassword());
+        return BaseResponse.success("Your password has been successfully reset. You can now log in.");
     }
 }

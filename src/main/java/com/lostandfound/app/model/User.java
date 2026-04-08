@@ -28,8 +28,13 @@ public class User extends BaseEntity implements UserDetails {
     @Column(name = "email", nullable = false, unique = true)
     private String email;
 
-    @Column(name = "password", nullable = false)
+    @Column(name = "password", nullable = true)
     private String password;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "provider", nullable = false)
+    @Builder.Default
+    private AuthProvider provider = AuthProvider.LOCAL;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)

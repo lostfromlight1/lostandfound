@@ -28,30 +28,33 @@ public class JwtService {
   @Value("${jwt.expiration.access-token}")
   private long accessTokenExpiration;
 
+
   public String generateAccessToken(UserDetails userDetails) {
     String token = buildToken(new HashMap<>(), userDetails, accessTokenExpiration);
     log.info("[{}] Access token generated for user: {}", getTraceId(), userDetails.getUsername());
     return token;
   }
 
+
   private String buildToken(
-      Map<String, Object> extraClaims, UserDetails userDetails, long expiration) {
+          Map<String, Object> extraClaims, UserDetails userDetails, long expiration) {
     log.debug("[{}] Building access token for user: {}", getTraceId(), userDetails.getUsername());
 
     if (userDetails instanceof User user) {
       extraClaims.put("userId", user.getId().toString());
       extraClaims.put("tokenType", "access");
+
       extraClaims.put(
-          "roles", user.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList());
+              "roles", user.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList());
     }
 
     return Jwts.builder()
-        .claims(extraClaims)
-        .subject(userDetails.getUsername())
-        .issuedAt(new Date())
-        .expiration(new Date(System.currentTimeMillis() + expiration))
-        .signWith(getSignInKey())
-        .compact();
+            .claims(extraClaims)
+            .subject(userDetails.getUsername())
+            .issuedAt(new Date())
+            .expiration(new Date(System.currentTimeMillis() + expiration))
+            .signWith(getSignInKey())
+            .compact();
   }
 
   public boolean isTokenValid(String token, UserDetails userDetails) {

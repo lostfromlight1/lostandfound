@@ -4,10 +4,12 @@ import com.lostandfound.app.dto.request.AuthRequest.*;
 import com.lostandfound.app.dto.response.*;
 import com.lostandfound.app.exception.*;
 import com.lostandfound.app.model.*;
+import com.lostandfound.app.repository.PasswordResetTokenRepository;
 import com.lostandfound.app.repository.UserRepository;
 import com.lostandfound.app.security.JwtService;
 import com.lostandfound.app.service.AuthService;
 import com.lostandfound.app.service.BaseService;
+import com.lostandfound.app.service.EmailService;
 import com.lostandfound.app.service.RefreshTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +18,10 @@ import org.springframework.security.authentication.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -27,9 +33,14 @@ public class AuthServiceImpl extends BaseService implements AuthService {
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final RefreshTokenService refreshTokenService;
+    private final EmailService emailService;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
 
     @Value("${jwt.expiration.access-token}")
     private long jwtExpiration;
+
+    @Value("${PUBLIC_FRONTEND_URL:http://localhost:3000}")
+    private String frontendUrl;
 
     @Override
     @Transactional
@@ -46,7 +57,8 @@ public class AuthServiceImpl extends BaseService implements AuthService {
                 .password(passwordEncoder.encode(request.password()))
                 .displayName(request.displayName())
                 .contactInfo(request.contactInfo())
-                .role(Role.USER) // Default role
+                .role(Role.USER)
+                .provider(AuthProvider.LOCAL)
                 .isLocked(false)
                 .build();
 
@@ -60,6 +72,14 @@ public class AuthServiceImpl extends BaseService implements AuthService {
     public AuthResponse login(LoginRequest request) {
         log.info("[{}] Login attempt for email: {}", getTraceId(), request.email());
 
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "User not found"));
+
+        if (user.getProvider() == AuthProvider.GOOGLE) {
+            log.warn("[{}] Login failed: User '{}' is a Google OAuth user", getTraceId(), request.email());
+            throw new AppException(ErrorCode.AUTH_FAILED, "Looks like you signed up with Google. Please use the 'Login with Google' button.");
+        }
+
         try {
             authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(request.email(), request.password()));
         } catch (BadCredentialsException ex) {
@@ -67,16 +87,13 @@ public class AuthServiceImpl extends BaseService implements AuthService {
             throw new AppException(ErrorCode.AUTH_FAILED, "Invalid email or password");
         }
 
-        User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "User not found"));
-
         if (Boolean.TRUE.equals(user.getIsLocked())) {
             log.warn("[{}] Login blocked: User account '{}' is locked", getTraceId(), user.getEmail());
             throw new AppException(ErrorCode.USER_LOCKED, "This account has been locked");
         }
 
         String accessToken = jwtService.generateAccessToken(user);
-        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getId()); // ADDED
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getId());
 
         return AuthResponse.builder()
                 .accessToken(accessToken)
@@ -88,13 +105,13 @@ public class AuthServiceImpl extends BaseService implements AuthService {
 
     @Override
     @Transactional
-    public AuthResponse refreshToken(TokenRefreshRequest request){
+    public AuthResponse refreshToken(TokenRefreshRequest request) {
         log.info("[{}] Refresh token request received", getTraceId());
 
         RefreshToken newRefreshToken = refreshTokenService.rotateRefreshToken(request.refreshToken());
         User user = newRefreshToken.getUser();
 
-        if(Boolean.TRUE.equals(user.getIsLocked())){
+        if (Boolean.TRUE.equals(user.getIsLocked())) {
             refreshTokenService.revokeByUser(user.getId());
             throw new AppException(ErrorCode.USER_LOCKED, "This account has been locked");
         }
@@ -107,7 +124,6 @@ public class AuthServiceImpl extends BaseService implements AuthService {
                 .expiresIn(jwtExpiration)
                 .user(mapToResponse(user))
                 .build();
-
     }
 
     @Override
@@ -115,8 +131,12 @@ public class AuthServiceImpl extends BaseService implements AuthService {
     public void changePassword(User currentUser, ChangePasswordRequest request) {
         log.info("[{}] Changing password for user ID: {}", getTraceId(), currentUser.getId());
 
-        // Always fetch a fresh entity from the DB to ensure we aren't working with stale detached data
         User user = fetchUserById(currentUser.getId());
+
+        if (user.getProvider() == AuthProvider.GOOGLE) {
+            log.warn("[{}] Password change blocked: User ID {} is a Google user", getTraceId(), user.getId());
+            throw new AppException(ErrorCode.BUSINESS_ERROR, "Google users cannot change their password here. Please manage your password via your Google Account.");
+        }
 
         if (!passwordEncoder.matches(request.oldPassword(), user.getPassword())) {
             log.warn("[{}] Password change failed: Incorrect old password for user ID: {}", getTraceId(), user.getId());
@@ -137,13 +157,56 @@ public class AuthServiceImpl extends BaseService implements AuthService {
         User user = userRepository.findByEmail(email).orElse(null);
 
         if (user == null) {
-            // Security Best Practice: Don't reveal if an email exists during a password reset request.
             log.info("[{}] Password reset ignored: Email '{}' not found in system", getTraceId(), email);
             return;
         }
 
-        // TODO: Implement email sending logic here (e.g., generate a short-lived token, save it to DB, and email a link)
-        log.info("[{}] Password reset link generated for user ID: {}", getTraceId(), user.getId());
+        if (user.getProvider() == AuthProvider.GOOGLE) {
+            log.info("[{}] Password reset ignored: Email '{}' belongs to a Google OAuth user", getTraceId(), email);
+            return;
+        }
+
+        passwordResetTokenRepository.deleteByUser_Id(user.getId());
+
+        String resetToken = UUID.randomUUID().toString();
+
+        PasswordResetToken tokenEntity = PasswordResetToken.builder()
+                .token(resetToken)
+                .user(user)
+                .expiresAt(Instant.now().plus(15, ChronoUnit.MINUTES))
+                .build();
+        passwordResetTokenRepository.save(tokenEntity);
+
+        String resetLink = frontendUrl + "/reset-password?token=" + resetToken;
+        emailService.sendPasswordResetEmail(email, resetLink);
+
+        log.info("[{}] Password reset link generated and saved to DB for user ID: {}", getTraceId(), user.getId());
+    }
+
+    @Override
+    @Transactional
+    public void confirmPasswordReset(String token, String newPassword) {
+        log.info("[{}] Confirming password reset with token", getTraceId());
+
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
+                .orElseThrow(() -> {
+                    log.warn("[{}] Password reset failed: Token not found", getTraceId());
+                    return new AppException(ErrorCode.TOKEN_INVALID, "Invalid password reset token.");
+                });
+
+        if (resetToken.getExpiresAt().isBefore(Instant.now())) {
+            log.warn("[{}] Password reset failed: Token expired for user ID: {}", getTraceId(), resetToken.getUser().getId());
+            passwordResetTokenRepository.delete(resetToken); // Clean up the expired token
+            throw new AppException(ErrorCode.TOKEN_EXPIRED, "This password reset link has expired. Please request a new one.");
+        }
+
+        User user = resetToken.getUser();
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        passwordResetTokenRepository.delete(resetToken);
+
+        log.info("[{}] Password successfully reset for user ID: {}", getTraceId(), user.getId());
     }
 
     // ------------------ Helpers ------------------

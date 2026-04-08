@@ -3,6 +3,7 @@ package com.lostandfound.app.config;
 import com.lostandfound.app.exception.RestAccessDeniedHandler;
 import com.lostandfound.app.exception.RestAuthenticationEntryPoint;
 import com.lostandfound.app.security.*;
+import com.lostandfound.app.security.OAuth2AuthenticationSuccessHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -34,6 +35,9 @@ public class SecurityConfig {
   private final RestAccessDeniedHandler accessDeniedHandler;
   private final SecurityProperties securityProperties;
 
+  // 1. ADDED: Inject the custom OAuth2 Success Handler
+  private final OAuth2AuthenticationSuccessHandler oAuth2SuccessHandler;
+
   @Bean
   PasswordEncoder passwordEncoder() {
     return new BCryptPasswordEncoder();
@@ -51,22 +55,25 @@ public class SecurityConfig {
     String[] publicRoutes = securityProperties.publicRoutes().toArray(new String[0]);
 
     http.csrf(AbstractHttpConfigurer::disable)
-        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-        .sessionManagement(
-            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .exceptionHandling(
-            ex -> {
-              ex.authenticationEntryPoint(authEntryPoint);
-              ex.accessDeniedHandler(accessDeniedHandler);
-            })
-        .authorizeHttpRequests(
-            auth ->
-                auth
-                    .requestMatchers(publicRoutes)
-                    .permitAll()
-
-                    .anyRequest()
-                    .authenticated());
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .sessionManagement(
+                    session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(
+                    ex -> {
+                      ex.authenticationEntryPoint(authEntryPoint);
+                      ex.accessDeniedHandler(accessDeniedHandler);
+                    })
+            .authorizeHttpRequests(
+                    auth ->
+                            auth
+                                    .requestMatchers(publicRoutes)
+                                    .permitAll()
+                                    .anyRequest()
+                                    .authenticated())
+            // 2. ADDED: OAuth2 Login Configuration
+            .oauth2Login(oauth2 -> oauth2
+                    .successHandler(oAuth2SuccessHandler)
+            );
 
     // --- FILTER CHAIN ORDERING ---
 

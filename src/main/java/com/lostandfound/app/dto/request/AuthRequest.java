@@ -51,4 +51,15 @@ public class AuthRequest {
             @NotBlank(message = "Refresh token is required")
             String refreshToken
     ){}
+
+    public record ConfirmPasswordResetRequest(
+            @NotBlank(message = "Reset token is required")
+            String token,
+
+            @NotBlank(message = "New password is required")
+            @Size(min = 8, max = 128)
+            @Pattern(regexp = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=!]).*$",
+                    message = "New password does not meet complexity requirements")
+            String newPassword
+    ) {}
 }

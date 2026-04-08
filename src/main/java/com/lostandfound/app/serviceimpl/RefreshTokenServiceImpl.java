@@ -64,8 +64,8 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
                 .token(hashedToken)
                 .expiresAt(Instant.now().plusMillis(refreshTokenDurationMs))
                 .revoked(false)
-                .active(true)
                 .build();
+
         refreshTokenRepository.save(refreshToken);
         refreshToken.setRawToken(rawToken);
 
@@ -87,10 +87,10 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
             refreshTokenRepository.revokeAllUserTokens(token.getUser().getId());
             throw new AppException(ErrorCode.TOKEN_INVALID, "Security breach detected. Please login again");
         }
+
         verifyExpiration(token);
 
         token.setRevoked(true);
-        token.setActive(false);
         refreshTokenRepository.save(token);
 
         log.debug("[{}] Token rotated successfully", MDC.get("traceId"));
