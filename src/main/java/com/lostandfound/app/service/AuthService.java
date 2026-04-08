@@ -1,5 +1,6 @@
 package com.lostandfound.app.service;
 
+import com.lostandfound.app.dto.request.AuthRequest;
 import com.lostandfound.app.dto.request.AuthRequest.ChangePasswordRequest;
 import com.lostandfound.app.dto.request.AuthRequest.LoginRequest;
 import com.lostandfound.app.dto.request.AuthRequest.RegisterRequest;
@@ -15,8 +16,7 @@ public interface AuthService {
 
     void changePassword(User currentUser, ChangePasswordRequest request);
 
-    /**
-     * Initiates a password reset flow (e.g., sending an email with a token)
-     */
     void resetPassword(String email);
+
+    AuthResponse refreshToken(AuthRequest.TokenRefreshRequest request);
 }

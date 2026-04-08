@@ -46,4 +46,9 @@ public class AuthRequest {
                     message = "New password does not meet complexity requirements")
             String newPassword
     ) {}
+
+    public record TokenRefreshRequest(
+            @NotBlank(message = "Refresh token is required")
+            String refreshToken
+    ){}
 }

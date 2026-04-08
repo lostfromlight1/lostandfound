@@ -73,9 +73,10 @@ app:
 jwt:
   issuer: lostandfound-app
   secret: ${JWT_SECRET:your-super-secret-development-key-32-chars-min}
-
   expiration:
-    access-token: 9000000000
+    access-token: 900000     # 15 minutes in ms
+    refresh-token: 604800000 # 7 days in ms
+
 
 springdoc:
   api-docs:

@@ -1,24 +1,18 @@
 package com.lostandfound.app.serviceimpl;
 
-import com.lostandfound.app.dto.request.AuthRequest.ChangePasswordRequest;
-import com.lostandfound.app.dto.request.AuthRequest.LoginRequest;
-import com.lostandfound.app.dto.request.AuthRequest.RegisterRequest;
-import com.lostandfound.app.dto.response.AuthResponse;
-import com.lostandfound.app.dto.response.UserResponse;
-import com.lostandfound.app.exception.AppException;
-import com.lostandfound.app.exception.ErrorCode;
-import com.lostandfound.app.model.Role;
-import com.lostandfound.app.model.User;
+import com.lostandfound.app.dto.request.AuthRequest.*;
+import com.lostandfound.app.dto.response.*;
+import com.lostandfound.app.exception.*;
+import com.lostandfound.app.model.*;
 import com.lostandfound.app.repository.UserRepository;
 import com.lostandfound.app.security.JwtService;
 import com.lostandfound.app.service.AuthService;
 import com.lostandfound.app.service.BaseService;
+import com.lostandfound.app.service.RefreshTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.authentication.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +26,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final RefreshTokenService refreshTokenService;
 
     @Value("${jwt.expiration.access-token}")
     private long jwtExpiration;
@@ -66,9 +61,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
         log.info("[{}] Login attempt for email: {}", getTraceId(), request.email());
 
         try {
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.email(), request.password())
-            );
+            authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(request.email(), request.password()));
         } catch (BadCredentialsException ex) {
             log.warn("[{}] Login failed for '{}': Invalid credentials", getTraceId(), request.email());
             throw new AppException(ErrorCode.AUTH_FAILED, "Invalid email or password");
@@ -79,17 +72,42 @@ public class AuthServiceImpl extends BaseService implements AuthService {
 
         if (Boolean.TRUE.equals(user.getIsLocked())) {
             log.warn("[{}] Login blocked: User account '{}' is locked", getTraceId(), user.getEmail());
-            throw new AppException(ErrorCode.USER_LOCKED, "This account has been locked by an administrator");
+            throw new AppException(ErrorCode.USER_LOCKED, "This account has been locked");
         }
 
-        String token = jwtService.generateAccessToken(user);
-        log.info("[{}] Login successful for user ID: {}", getTraceId(), user.getId());
+        String accessToken = jwtService.generateAccessToken(user);
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getId()); // ADDED
 
         return AuthResponse.builder()
-                .accessToken(token)
+                .accessToken(accessToken)
+                .refreshToken(refreshToken.getRawToken())
                 .expiresIn(jwtExpiration)
                 .user(mapToResponse(user))
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public AuthResponse refreshToken(TokenRefreshRequest request){
+        log.info("[{}] Refresh token request received", getTraceId());
+
+        RefreshToken newRefreshToken = refreshTokenService.rotateRefreshToken(request.refreshToken());
+        User user = newRefreshToken.getUser();
+
+        if(Boolean.TRUE.equals(user.getIsLocked())){
+            refreshTokenService.revokeByUser(user.getId());
+            throw new AppException(ErrorCode.USER_LOCKED, "This account has been locked");
+        }
+
+        String accessToken = jwtService.generateAccessToken(user);
+
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(newRefreshToken.getRawToken())
+                .expiresIn(jwtExpiration)
+                .user(mapToResponse(user))
+                .build();
+
     }
 
     @Override

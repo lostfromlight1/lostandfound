@@ -6,6 +6,7 @@ import com.lostandfound.app.dto.request.AuthRequest.RegisterRequest;
 import com.lostandfound.app.dto.response.AuthResponse;
 import com.lostandfound.app.dto.response.BaseResponse;
 import com.lostandfound.app.dto.response.UserResponse;
+import com.lostandfound.app.dto.request.AuthRequest.TokenRefreshRequest;
 import com.lostandfound.app.model.User;
 import com.lostandfound.app.security.CheckSecurity;
 import com.lostandfound.app.security.CurrentUser;
@@ -48,6 +49,16 @@ public class AuthController {
         log.info("Received login request for email: {}", request.email());
         AuthResponse response = authService.login(request);
         return BaseResponse.success("Login successful", response);
+    }
+
+    @PostMapping("/refresh")
+    @CheckSecurity.Public.canRead
+    @Operation(summary = "Refresh Token", description = "Get a new access token using a valid refresh token.")
+    public ResponseEntity<BaseResponse<AuthResponse>> refreshToken(
+            @Valid @RequestBody TokenRefreshRequest request) {
+        log.info("Received refresh token request");
+        AuthResponse response = authService.refreshToken(request);
+        return BaseResponse.success("Token refreshed successfully", response);
     }
 
     @PostMapping("/change-password")

@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/users")
+
 @RequiredArgsConstructor
 @Tag(name = "2. User Management", description = "Endpoints for user profiles, searches, and administrative actions")
 public class UserController {
@@ -41,7 +42,7 @@ public class UserController {
         return BaseResponse.success("Profile fetched successfully", response);
     }
 
-    @PutMapping("/me")
+    @PutMapping("/update")
     @Operation(summary = "Update My Profile", description = "Updates the display name and contact info of the current user.")
     public ResponseEntity<BaseResponse<UserResponse>> updateProfile(
             @Parameter(hidden = true) @CurrentUser User currentUser,

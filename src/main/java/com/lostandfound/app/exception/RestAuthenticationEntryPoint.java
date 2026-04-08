@@ -32,7 +32,7 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
         if ("expired".equals(exceptionAttr)) {
             errorCode = ErrorCode.TOKEN_EXPIRED;
-        } else if ("invalid".equals(exceptionAttr)) {
+        } else if ("invalid".equals(exceptionAttr) || "invalid_token_type".equals(exceptionAttr)) {
             errorCode = ErrorCode.TOKEN_INVALID;
         }
 
