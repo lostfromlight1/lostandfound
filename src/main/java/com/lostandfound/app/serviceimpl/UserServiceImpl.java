@@ -7,6 +7,7 @@ import com.lostandfound.app.exception.ErrorCode;
 import com.lostandfound.app.model.User;
 import com.lostandfound.app.repository.UserRepository;
 import com.lostandfound.app.service.BaseService;
+import com.lostandfound.app.service.RefreshTokenService;
 import com.lostandfound.app.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,7 +15,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-// import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @Service
@@ -22,11 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserServiceImpl extends BaseService implements UserService {
 
     private final UserRepository userRepository;
+    private final RefreshTokenService refreshTokenService; // <-- ADDED
 
     @Override
     public UserResponse getMe(User currentUser) {
         log.info("[{}] Fetching profile for current user ID: {}", getTraceId(), currentUser.getId());
-        // Fetch fresh to ensure we have the latest DB state, not just the token state
         return mapToResponse(fetchUserById(currentUser.getId()));
     }
 
@@ -44,22 +44,6 @@ public class UserServiceImpl extends BaseService implements UserService {
 
         return mapToResponse(updated);
     }
-
-    /*
-    @Override
-    @Transactional
-    public UserResponse uploadProfilePicture(User currentUser, MultipartFile file) {
-        log.info("[{}] Uploading profile picture for user ID: {}", getTraceId(), currentUser.getId());
-
-        // 1. Validate file size/type (or let GlobalExceptionHandler catch MaxUploadSizeExceededException)
-        // 2. Upload file to S3 / Local Storage via an ImageService
-        // 3. Create/Save Image entity
-        // 4. Link Image to User entity
-        // 5. Save User
-
-        throw new AppException(ErrorCode.INTERNAL_ERROR, "Not implemented yet");
-    }
-    */
 
     @Override
     public UserResponse getPublicProfile(Long userId) {
@@ -96,10 +80,9 @@ public class UserServiceImpl extends BaseService implements UserService {
         user.setIsLocked(true);
         userRepository.save(user);
 
-        log.warn("[{}] User ID: {} has been locked/banned", getTraceId(), userId);
+        refreshTokenService.revokeByUser(userId);
 
-        // Note: Because JWTs are stateless, they will technically remain valid until expiration
-        // unless you implement a token blacklist. However, their next login attempt will be blocked.
+        log.warn("[{}] User ID: {} has been locked/banned and all refresh tokens revoked", getTraceId(), userId);
     }
 
     // ------------------ Helpers ------------------

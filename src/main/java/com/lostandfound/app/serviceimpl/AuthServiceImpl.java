@@ -6,6 +6,7 @@ import com.lostandfound.app.exception.*;
 import com.lostandfound.app.model.*;
 import com.lostandfound.app.repository.PasswordResetTokenRepository;
 import com.lostandfound.app.repository.UserRepository;
+import com.lostandfound.app.repository.VerificationTokenRepository;
 import com.lostandfound.app.security.JwtService;
 import com.lostandfound.app.service.AuthService;
 import com.lostandfound.app.service.BaseService;
@@ -35,6 +36,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
     private final RefreshTokenService refreshTokenService;
     private final EmailService emailService;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final VerificationTokenRepository verificationTokenRepository;
 
     @Value("${jwt.expiration.access-token}")
     private long jwtExpiration;
@@ -45,10 +47,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
     @Override
     @Transactional
     public UserResponse register(RegisterRequest request) {
-        log.info("[{}] Registration attempt for email: {}", getTraceId(), request.email());
-
         if (userRepository.existsByEmail(request.email())) {
-            log.warn("[{}] Registration failed: Email '{}' already exists", getTraceId(), request.email());
             throw new AppException(ErrorCode.EMAIL_ALREADY_IN_USE, "Email is already registered");
         }
 
@@ -60,35 +59,44 @@ public class AuthServiceImpl extends BaseService implements AuthService {
                 .role(Role.USER)
                 .provider(AuthProvider.LOCAL)
                 .isLocked(false)
+                .emailVerified(false)
                 .build();
 
         User savedUser = userRepository.save(user);
-        log.info("[{}] User registered successfully with ID: {}", getTraceId(), savedUser.getId());
 
+        // Verification Flow
+        String token = UUID.randomUUID().toString();
+        VerificationToken verificationToken = VerificationToken.builder()
+                .token(token)
+                .user(savedUser)
+                .expiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
+                .build();
+        verificationTokenRepository.save(verificationToken);
+
+        emailService.sendVerificationEmail(savedUser.getEmail(), frontendUrl + "/verify-email?token=" + token);
         return mapToResponse(savedUser);
     }
 
     @Override
     public AuthResponse login(LoginRequest request) {
-        log.info("[{}] Login attempt for email: {}", getTraceId(), request.email());
-
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "User not found"));
 
         if (user.getProvider() == AuthProvider.GOOGLE) {
-            log.warn("[{}] Login failed: User '{}' is a Google OAuth user", getTraceId(), request.email());
             throw new AppException(ErrorCode.AUTH_FAILED, "Looks like you signed up with Google. Please use the 'Login with Google' button.");
+        }
+
+        if (!user.isEmailVerified()) {
+            throw new AppException(ErrorCode.AUTH_FAILED, "Please verify your email address before logging in. Check your inbox.");
         }
 
         try {
             authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(request.email(), request.password()));
         } catch (BadCredentialsException ex) {
-            log.warn("[{}] Login failed for '{}': Invalid credentials", getTraceId(), request.email());
             throw new AppException(ErrorCode.AUTH_FAILED, "Invalid email or password");
         }
 
         if (Boolean.TRUE.equals(user.getIsLocked())) {
-            log.warn("[{}] Login blocked: User account '{}' is locked", getTraceId(), user.getEmail());
             throw new AppException(ErrorCode.USER_LOCKED, "This account has been locked");
         }
 
@@ -106,8 +114,6 @@ public class AuthServiceImpl extends BaseService implements AuthService {
     @Override
     @Transactional
     public AuthResponse refreshToken(TokenRefreshRequest request) {
-        log.info("[{}] Refresh token request received", getTraceId());
-
         RefreshToken newRefreshToken = refreshTokenService.rotateRefreshToken(request.refreshToken());
         User user = newRefreshToken.getUser();
 
@@ -129,45 +135,27 @@ public class AuthServiceImpl extends BaseService implements AuthService {
     @Override
     @Transactional
     public void changePassword(User currentUser, ChangePasswordRequest request) {
-        log.info("[{}] Changing password for user ID: {}", getTraceId(), currentUser.getId());
-
         User user = fetchUserById(currentUser.getId());
 
         if (user.getProvider() == AuthProvider.GOOGLE) {
-            log.warn("[{}] Password change blocked: User ID {} is a Google user", getTraceId(), user.getId());
-            throw new AppException(ErrorCode.BUSINESS_ERROR, "Google users cannot change their password here. Please manage your password via your Google Account.");
+            throw new AppException(ErrorCode.BUSINESS_ERROR, "Google users cannot change their password here.");
         }
 
         if (!passwordEncoder.matches(request.oldPassword(), user.getPassword())) {
-            log.warn("[{}] Password change failed: Incorrect old password for user ID: {}", getTraceId(), user.getId());
             throw new AppException(ErrorCode.BUSINESS_ERROR, "Incorrect current password");
         }
 
         user.setPassword(passwordEncoder.encode(request.newPassword()));
         userRepository.save(user);
-
-        log.info("[{}] Password changed successfully for user ID: {}", getTraceId(), user.getId());
     }
 
     @Override
     @Transactional
     public void resetPassword(String email) {
-        log.info("[{}] Password reset requested for email: {}", getTraceId(), email);
-
         User user = userRepository.findByEmail(email).orElse(null);
-
-        if (user == null) {
-            log.info("[{}] Password reset ignored: Email '{}' not found in system", getTraceId(), email);
-            return;
-        }
-
-        if (user.getProvider() == AuthProvider.GOOGLE) {
-            log.info("[{}] Password reset ignored: Email '{}' belongs to a Google OAuth user", getTraceId(), email);
-            return;
-        }
+        if (user == null || user.getProvider() == AuthProvider.GOOGLE) return;
 
         passwordResetTokenRepository.deleteByUser_Id(user.getId());
-
         String resetToken = UUID.randomUUID().toString();
 
         PasswordResetToken tokenEntity = PasswordResetToken.builder()
@@ -176,40 +164,73 @@ public class AuthServiceImpl extends BaseService implements AuthService {
                 .expiresAt(Instant.now().plus(15, ChronoUnit.MINUTES))
                 .build();
         passwordResetTokenRepository.save(tokenEntity);
-
-        String resetLink = frontendUrl + "/reset-password?token=" + resetToken;
-        emailService.sendPasswordResetEmail(email, resetLink);
-
-        log.info("[{}] Password reset link generated and saved to DB for user ID: {}", getTraceId(), user.getId());
+        emailService.sendPasswordResetEmail(email, frontendUrl + "/reset-password?token=" + resetToken);
     }
 
     @Override
     @Transactional
     public void confirmPasswordReset(String token, String newPassword) {
-        log.info("[{}] Confirming password reset with token", getTraceId());
-
         PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
-                .orElseThrow(() -> {
-                    log.warn("[{}] Password reset failed: Token not found", getTraceId());
-                    return new AppException(ErrorCode.TOKEN_INVALID, "Invalid password reset token.");
-                });
+                .orElseThrow(() -> new AppException(ErrorCode.TOKEN_INVALID, "Invalid password reset token."));
 
         if (resetToken.getExpiresAt().isBefore(Instant.now())) {
-            log.warn("[{}] Password reset failed: Token expired for user ID: {}", getTraceId(), resetToken.getUser().getId());
-            passwordResetTokenRepository.delete(resetToken); // Clean up the expired token
-            throw new AppException(ErrorCode.TOKEN_EXPIRED, "This password reset link has expired. Please request a new one.");
+            passwordResetTokenRepository.delete(resetToken);
+            throw new AppException(ErrorCode.TOKEN_EXPIRED, "This password reset link has expired.");
         }
 
         User user = resetToken.getUser();
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
-
         passwordResetTokenRepository.delete(resetToken);
-
-        log.info("[{}] Password successfully reset for user ID: {}", getTraceId(), user.getId());
     }
 
-    // ------------------ Helpers ------------------
+    @Override
+    @Transactional
+    public void logout(String refreshToken) {
+        try {
+            refreshTokenService.revokeToken(refreshToken);
+        } catch (Exception e) {
+            log.warn("Error revoking token during logout: {}", e.getMessage());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void verifyEmail(String token) {
+        VerificationToken verificationToken = verificationTokenRepository.findByToken(token)
+                .orElseThrow(() -> new AppException(ErrorCode.TOKEN_INVALID, "Invalid verification token."));
+
+        if (verificationToken.getExpiresAt().isBefore(Instant.now())) {
+            verificationTokenRepository.delete(verificationToken);
+            throw new AppException(ErrorCode.TOKEN_EXPIRED, "This verification link has expired. Please request a new one.");
+        }
+
+        User user = verificationToken.getUser();
+        user.setEmailVerified(true);
+        userRepository.save(user);
+        verificationTokenRepository.delete(verificationToken);
+    }
+
+    @Override
+    @Transactional
+    public void resendVerificationEmail(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "User not found"));
+
+        if (user.isEmailVerified() || user.getProvider() == AuthProvider.GOOGLE) return;
+
+        verificationTokenRepository.deleteByUser_Id(user.getId());
+
+        String token = UUID.randomUUID().toString();
+        VerificationToken verificationToken = VerificationToken.builder()
+                .token(token)
+                .user(user)
+                .expiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
+                .build();
+        verificationTokenRepository.save(verificationToken);
+
+        emailService.sendVerificationEmail(user.getEmail(), frontendUrl + "/verify-email?token=" + token);
+    }
 
     private User fetchUserById(Long userId) {
         return userRepository.findById(userId)

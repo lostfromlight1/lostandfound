@@ -1,8 +1,10 @@
 package com.lostandfound.app.model;
 
 import jakarta.persistence.*;
+
 import java.util.Collection;
 import java.util.List;
+
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.SQLRestriction;
@@ -28,13 +30,20 @@ public class User extends BaseEntity implements UserDetails {
     @Column(name = "email", nullable = false, unique = true)
     private String email;
 
-    @Column(name = "password", nullable = true)
+    @Column(name = "password")
     private String password;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "provider", nullable = false)
     @Builder.Default
     private AuthProvider provider = AuthProvider.LOCAL;
+
+    @Column(name = "provider_id")
+    private String providerId;
+
+    @Column(name = "email_verified", nullable = false)
+    @Builder.Default
+    private boolean emailVerified = false;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
@@ -48,25 +57,14 @@ public class User extends BaseEntity implements UserDetails {
     @Column(name = "token", length = 512)
     private String token;
 
-    // --- Profile Data ---
-
     @Column(name = "display_name")
     private String displayName;
 
     @Column(name = "contact_info")
     private String contactInfo;
 
-    /* * We will map this fully when we create the Image entity next!
-     * * @OneToOne(fetch = FetchType.LAZY)
-     * @JoinColumn(name = "profile_image_id")
-     * private Image profileImage;
-     */
-
-    // --- UserDetails Methods ---
-
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // Spring Security typically expects roles to be prefixed with "ROLE_"
         return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
     }
 

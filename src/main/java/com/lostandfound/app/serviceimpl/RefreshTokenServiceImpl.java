@@ -7,6 +7,7 @@ import com.lostandfound.app.model.User;
 import com.lostandfound.app.repository.RefreshTokenRepository;
 import com.lostandfound.app.repository.UserRepository;
 import com.lostandfound.app.service.RefreshTokenService;
+import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -19,11 +20,14 @@ import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class RefreshTokenServiceImpl implements RefreshTokenService {
+
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
 
@@ -51,10 +55,20 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Override
     @Transactional
     public RefreshToken createRefreshToken(Long userId) {
-        log.info("[{}] Creating refresh token for user: {}", MDC.get("traceId"), userId);
-
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "User not found"));
+
+        String ipAddress = "UNKNOWN";
+        String userAgent = "UNKNOWN";
+        try {
+            ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attrs != null) {
+                HttpServletRequest req = attrs.getRequest();
+                ipAddress = req.getHeader("X-Forwarded-For");
+                if (ipAddress == null || ipAddress.isEmpty()) ipAddress = req.getRemoteAddr();
+                userAgent = req.getHeader("User-Agent");
+            }
+        } catch (Exception ignored) {}
 
         String rawToken = generateSecureToken();
         String hashedToken = hashToken(rawToken);
@@ -64,13 +78,12 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
                 .token(hashedToken)
                 .expiresAt(Instant.now().plusMillis(refreshTokenDurationMs))
                 .revoked(false)
+                .ipAddress(ipAddress)
+                .userAgent(userAgent)
                 .build();
 
         refreshTokenRepository.save(refreshToken);
         refreshToken.setRawToken(rawToken);
-
-        log.info("[{}] Refresh token created successfully for user: {}", MDC.get("traceId"), userId);
-
         return refreshToken;
     }
 
@@ -78,8 +91,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Transactional
     public RefreshToken rotateRefreshToken(String tokenStr) {
         String hashedIncomingToken = hashToken(tokenStr);
-
-        RefreshToken token  =  refreshTokenRepository.findByToken(hashedIncomingToken)
+        RefreshToken token = refreshTokenRepository.findByToken(hashedIncomingToken)
                 .orElseThrow(() -> new AppException(ErrorCode.TOKEN_INVALID, "Invalid refresh token"));
 
         if(token.isRevoked()){
@@ -89,18 +101,14 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         }
 
         verifyExpiration(token);
-
         token.setRevoked(true);
         refreshTokenRepository.save(token);
-
-        log.debug("[{}] Token rotated successfully", MDC.get("traceId"));
         return createRefreshToken(token.getUser().getId());
     }
 
     @Override
     public void verifyExpiration(RefreshToken token) {
         if (token.getExpiresAt().isBefore(Instant.now())) {
-            log.info("[{}] Token {} expired, purging", MDC.get("traceId"), token.getId());
             refreshTokenRepository.delete(token);
             throw new AppException(ErrorCode.TOKEN_EXPIRED, "Session expired");
         }
@@ -109,10 +117,16 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Override
     @Transactional
     public void revokeByUser(Long userId) {
-        log.info("[{}] Revoking all sessions for user: {}", MDC.get("traceId"), userId);
-        if (!userRepository.existsById(userId)) {
-            throw new AppException(ErrorCode.RESOURCE_NOT_FOUND, "User not found");
-        }
         refreshTokenRepository.revokeAllUserTokens(userId);
+    }
+
+    @Override
+    @Transactional
+    public void revokeToken(String tokenStr) {
+        String hashedToken = hashToken(tokenStr);
+        refreshTokenRepository.findByToken(hashedToken).ifPresent(token -> {
+            token.setRevoked(true);
+            refreshTokenRepository.save(token);
+        });
     }
 }

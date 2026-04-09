@@ -1,4 +1,4 @@
-package com.lostandfound.app.security;
+package com.lostandfound.app.annotation;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import java.lang.annotation.*;

@@ -10,4 +10,6 @@ public interface RefreshTokenService {
     void verifyExpiration(RefreshToken token);
 
     void revokeByUser(Long userId);
+
+    void revokeToken(String tokenStr);
 }

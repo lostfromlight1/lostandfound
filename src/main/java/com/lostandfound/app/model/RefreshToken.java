@@ -2,7 +2,9 @@ package com.lostandfound.app.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+
 import java.time.Instant;
+
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
@@ -37,4 +39,12 @@ public class RefreshToken extends BaseEntity {
     @Builder.Default
     private boolean revoked = false;
 
+    @Column(name = "ip_address", length = 100)
+    private String ipAddress;
+
+    @Column(name = "user_agent", columnDefinition = "TEXT")
+    private String userAgent;
+
+    @Column(name = "device", length = 100)
+    private String device;
 }

@@ -6,6 +6,7 @@ import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +36,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
-        final String jwt = extractToken(request);
+        String jwt = extractTokenFromHeader(request);
+        if (jwt == null) {
+            jwt = extractTokenFromCookie(request, "accessToken");
+        }
 
         if (jwt == null) {
             filterChain.doFilter(request, response);
@@ -72,9 +76,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private String extractToken(HttpServletRequest request) {
+    private String extractTokenFromHeader(HttpServletRequest request) {
         String header = request.getHeader("Authorization");
         return (header != null && header.startsWith("Bearer ")) ? header.substring(7) : null;
+    }
+
+    private String extractTokenFromCookie(HttpServletRequest request, String cookieName) {
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if (cookieName.equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
     }
 
     private void setAuthentication(HttpServletRequest request, UserDetails user) {

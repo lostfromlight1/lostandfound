@@ -21,4 +21,10 @@ public interface AuthService {
     AuthResponse refreshToken(AuthRequest.TokenRefreshRequest request);
 
     void confirmPasswordReset(String token, String newPassword);
+
+    void logout(String refreshToken);
+
+    void verifyEmail(String token);
+
+    void resendVerificationEmail(String email);
 }
