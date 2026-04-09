@@ -45,11 +45,12 @@ spring:
     baseline-on-migrate: true
     validate-on-migrate: true
 
+  # CORRECT INDENTATION FOR MAIL
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
+    username: ${MAIL_USERNAME:placeholder@gmail.com}
+    password: ${MAIL_PASSWORD:placeholder-password}
     properties:
       mail:
         smtp:
@@ -57,13 +58,14 @@ spring:
           starttls:
             enable: true
 
+  # CORRECT INDENTATION FOR OAUTH2
   security:
     oauth2:
       client:
         registration:
           google:
-            client-id: ${GOOGLE_CLIENT_ID}
-            client-secret: ${GOOGLE_CLIENT_SECRET}
+            client-id: ${GOOGLE_CLIENT_ID:placeholder-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:placeholder-secret}
             scope:
               - email
               - profile
