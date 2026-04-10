@@ -1,3 +1,5 @@
+// src/main/java/com/lostandfound/app/serviceimpl/AuthServiceImpl.java
+
 package com.lostandfound.app.serviceimpl;
 
 import com.lostandfound.app.dto.request.AuthRequest.*;
@@ -111,10 +113,11 @@ public class AuthServiceImpl extends BaseService implements AuthService {
                 .build();
     }
 
+    // FIX: Method parameter changed from TokenRefreshRequest object to String
     @Override
     @Transactional
-    public AuthResponse refreshToken(TokenRefreshRequest request) {
-        RefreshToken newRefreshToken = refreshTokenService.rotateRefreshToken(request.refreshToken());
+    public AuthResponse refreshToken(String refreshTokenStr) {
+        RefreshToken newRefreshToken = refreshTokenService.rotateRefreshToken(refreshTokenStr);
         User user = newRefreshToken.getUser();
 
         if (Boolean.TRUE.equals(user.getIsLocked())) {

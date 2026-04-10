@@ -1,3 +1,5 @@
+// src/main/java/com/lostandfound/app/controller/AuthController.java
+
 package com.lostandfound.app.controller;
 
 import com.lostandfound.app.annotation.ApiId;
@@ -8,11 +10,12 @@ import com.lostandfound.app.dto.request.AuthRequest.RegisterRequest;
 import com.lostandfound.app.dto.response.AuthResponse;
 import com.lostandfound.app.dto.response.BaseResponse;
 import com.lostandfound.app.dto.response.UserResponse;
-import com.lostandfound.app.dto.request.AuthRequest.TokenRefreshRequest;
 import com.lostandfound.app.model.User;
 import com.lostandfound.app.annotation.CheckSecurity;
 import com.lostandfound.app.annotation.CurrentUser;
 import com.lostandfound.app.service.AuthService;
+import com.lostandfound.app.exception.AppException;
+import com.lostandfound.app.exception.ErrorCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,7 +31,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Value;
 
-
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -37,6 +39,7 @@ import org.springframework.beans.factory.annotation.Value;
 public class AuthController {
 
     private final AuthService authService;
+
     @Value("${jwt.expiration.access-token}")
     private long accessTokenDurationMs;
 
@@ -63,14 +66,20 @@ public class AuthController {
         return BaseResponse.success("Login successful", authData);
     }
 
+    // FIX: Replaced @RequestBody with @CookieValue to read the HttpOnly token
     @PostMapping("/refresh")
     @CheckSecurity.Public.canRead
     @ApiId("AUTH-003")
     public ResponseEntity<BaseResponse<AuthResponse>> refreshToken(
-            @Valid @RequestBody TokenRefreshRequest request,
+            @CookieValue(name = "refreshToken", required = false) String refreshTokenString,
             HttpServletResponse response) {
 
-        AuthResponse authData = authService.refreshToken(request);
+        if (refreshTokenString == null || refreshTokenString.isBlank()) {
+            throw new AppException(ErrorCode.AUTH_FAILED, "Refresh token is missing or expired");
+        }
+
+        // Pass the raw string to the service
+        AuthResponse authData = authService.refreshToken(refreshTokenString);
         setTokenCookies(response, authData.accessToken(), authData.refreshToken());
 
         return BaseResponse.success("Token refreshed successfully", authData);
@@ -139,6 +148,7 @@ public class AuthController {
 
         return BaseResponse.success("Successfully logged out");
     }
+
     // ---------------------- Helper Method ----------------------
 
     private void setTokenCookies(HttpServletResponse response, String accessToken, String refreshToken) {
