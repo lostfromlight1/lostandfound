@@ -1,0 +1,1 @@
+ALTER TABLE posts ADD COLUMN reward NUMERIC(10, 2);
