@@ -26,6 +26,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Value;
+
 
 @Slf4j
 @RestController
@@ -35,6 +37,11 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    @Value("${jwt.expiration.access-token}")
+    private long accessTokenDurationMs;
+
+    @Value("${jwt.expiration.refresh-token}")
+    private long refreshTokenDurationMs;
 
     @PostMapping("/register")
     @CheckSecurity.Public.canRead
@@ -46,15 +53,27 @@ public class AuthController {
     @PostMapping("/login")
     @CheckSecurity.Public.canRead
     @ApiId("AUTH-002")
-    public ResponseEntity<BaseResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
-        return BaseResponse.success("Login successful", authService.login(request));
+    public ResponseEntity<BaseResponse<AuthResponse>> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletResponse response) {
+
+        AuthResponse authData = authService.login(request);
+        setTokenCookies(response, authData.accessToken(), authData.refreshToken());
+
+        return BaseResponse.success("Login successful", authData);
     }
 
     @PostMapping("/refresh")
     @CheckSecurity.Public.canRead
     @ApiId("AUTH-003")
-    public ResponseEntity<BaseResponse<AuthResponse>> refreshToken(@Valid @RequestBody TokenRefreshRequest request) {
-        return BaseResponse.success("Token refreshed successfully", authService.refreshToken(request));
+    public ResponseEntity<BaseResponse<AuthResponse>> refreshToken(
+            @Valid @RequestBody TokenRefreshRequest request,
+            HttpServletResponse response) {
+
+        AuthResponse authData = authService.refreshToken(request);
+        setTokenCookies(response, authData.accessToken(), authData.refreshToken());
+
+        return BaseResponse.success("Token refreshed successfully", authData);
     }
 
     @PostMapping("/change-password")
@@ -119,5 +138,27 @@ public class AuthController {
         response.addHeader(HttpHeaders.SET_COOKIE, clearRefresh.toString());
 
         return BaseResponse.success("Successfully logged out");
+    }
+    // ---------------------- Helper Method ----------------------
+
+    private void setTokenCookies(HttpServletResponse response, String accessToken, String refreshToken) {
+        ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(accessTokenDurationMs / 1000)
+                .sameSite("Lax")
+                .build();
+
+        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(refreshTokenDurationMs / 1000)
+                .sameSite("Lax")
+                .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
     }
 }
