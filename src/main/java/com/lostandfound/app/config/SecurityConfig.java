@@ -1,9 +1,10 @@
+// src/main/java/com/lostandfound/app/config/SecurityConfig.java
+
 package com.lostandfound.app.config;
 
 import com.lostandfound.app.exception.RestAccessDeniedHandler;
 import com.lostandfound.app.exception.RestAuthenticationEntryPoint;
 import com.lostandfound.app.security.*;
-import com.lostandfound.app.security.OAuth2AuthenticationSuccessHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -35,8 +36,7 @@ public class SecurityConfig {
   private final RestAccessDeniedHandler accessDeniedHandler;
   private final SecurityProperties securityProperties;
 
-  // 1. ADDED: Inject the custom OAuth2 Success Handler
-  private final OAuth2AuthenticationSuccessHandler oAuth2SuccessHandler;
+  // REMOVED: OAuth2 Success and Failure handlers
 
   @Bean
   PasswordEncoder passwordEncoder() {
@@ -56,34 +56,19 @@ public class SecurityConfig {
 
     http.csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .sessionManagement(
-                    session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .exceptionHandling(
-                    ex -> {
-                      ex.authenticationEntryPoint(authEntryPoint);
-                      ex.accessDeniedHandler(accessDeniedHandler);
-                    })
-            .authorizeHttpRequests(
-                    auth ->
-                            auth
-                                    .requestMatchers(publicRoutes)
-                                    .permitAll()
-                                    .anyRequest()
-                                    .authenticated())
-            // 2. ADDED: OAuth2 Login Configuration
-            .oauth2Login(oauth2 -> oauth2
-                    .successHandler(oAuth2SuccessHandler)
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(ex -> {
+              ex.authenticationEntryPoint(authEntryPoint);
+              ex.accessDeniedHandler(accessDeniedHandler);
+            })
+            .authorizeHttpRequests(auth -> auth
+                    .requestMatchers(publicRoutes).permitAll()
+                    .anyRequest().authenticated()
             );
+    // REMOVED: .oauth2Login(...) block entirely because NextAuth handles it now
 
-    // --- FILTER CHAIN ORDERING ---
-
-    // 1. Trace ID first so we can log everything
     http.addFilterBefore(traceIdFilter, UsernamePasswordAuthenticationFilter.class);
-
-    // 2. GATEWAY GUARD: Check the X-API-KEY before anything else!
     http.addFilterAfter(apiKeyFilter, TraceIdFilter.class);
-
-    // 3. USER AUTHENTICATION: Check the JWT token
     http.addFilterAfter(jwtAuthFilter, ApiKeyFilter.class);
 
     return http.build();

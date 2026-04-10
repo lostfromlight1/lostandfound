@@ -1,3 +1,5 @@
+// src/main/java/com/lostandfound/app/exception/ErrorCode.java
+
 package com.lostandfound.app.exception;
 
 import java.util.Arrays;
@@ -14,6 +16,10 @@ public enum ErrorCode {
   AUTH_FAILED(HttpStatus.UNAUTHORIZED, "AUTH_001", "Authentication failed"),
   AUTH_REQUIRED(HttpStatus.UNAUTHORIZED, "AUTH_002", "Authentication is required to access this resource"),
   ACCESS_DENIED(HttpStatus.FORBIDDEN, "AUTH_003", "You do not have permission to perform this action"),
+
+  // <-- ADDED THIS NEW ERROR CODE -->
+  UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "AUTH_004", "Missing or invalid authentication token"),
+
   USER_LOCKED(HttpStatus.FORBIDDEN, "USR_001", "This account has been locked by an administrator"),
   EMAIL_ALREADY_IN_USE(HttpStatus.CONFLICT, "USR_002", "This email address is already registered"),
   USERNAME_ALREADY_IN_USE(HttpStatus.CONFLICT, "USR_003", "This username is already taken"),
