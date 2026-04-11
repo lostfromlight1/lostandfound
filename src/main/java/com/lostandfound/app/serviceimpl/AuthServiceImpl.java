@@ -123,7 +123,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
 
         String accessToken = jwtService.generateAccessToken(user);
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getId());
-
+        log.info("User logged in successfully: {} (Role: {})", user.getEmail(), user.getRole());
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken.getRawToken())
@@ -315,7 +315,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
 
         verificationTokenRepository.deleteByUser_Id(user.getId());
 
-        String token = UUID.randomUUID().toString();
+        String token = generateVerificationCode();
         VerificationToken verificationToken = VerificationToken.builder()
                 .token(token)
                 .user(user)
