@@ -36,17 +36,17 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
-    public void sendVerificationEmail(String to, String verificationLink) {
-        log.info("Sending email verification to: {}", to);
+    public void sendVerificationEmail(String to, String verificationCode) {
+        log.info("Sending email verification code to: {}", to);
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromEmail);
         message.setTo(to);
         message.setSubject("Verify Your Email - Lost & Found");
         message.setText("Hello,\n\n" +
-                "Welcome to Lost & Found! Please verify your email address by clicking the link below:\n\n" +
-                verificationLink + "\n\n" +
-                "This link will expire in 24 hours.\n\n" +
+                "Welcome to Lost & Found! Please verify your email address by entering the following 6-character code on the verification page:\n\n" +
+                "   [ " + verificationCode + " ]   \n\n" +
+                "This code will expire in 24 hours.\n\n" +
                 "Thanks,\nThe Lost & Found Team");
 
         sendEmail(message, to, "Verification");

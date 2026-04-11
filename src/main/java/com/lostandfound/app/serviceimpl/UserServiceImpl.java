@@ -22,10 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserServiceImpl extends BaseService implements UserService {
 
     private final UserRepository userRepository;
-    private final RefreshTokenService refreshTokenService; // <-- ADDED
+    private final RefreshTokenService refreshTokenService;
 
     @Override
     public UserResponse getMe(User currentUser) {
+        validateCurrentUser(currentUser);
         log.info("[{}] Fetching profile for current user ID: {}", getTraceId(), currentUser.getId());
         return mapToResponse(fetchUserById(currentUser.getId()));
     }
@@ -33,6 +34,7 @@ public class UserServiceImpl extends BaseService implements UserService {
     @Override
     @Transactional
     public UserResponse updateProfile(User currentUser, UpdateProfileRequest request) {
+        validateCurrentUser(currentUser);
         log.info("[{}] Updating profile for user ID: {}", getTraceId(), currentUser.getId());
 
         User user = fetchUserById(currentUser.getId());
@@ -86,6 +88,12 @@ public class UserServiceImpl extends BaseService implements UserService {
     }
 
     // ------------------ Helpers ------------------
+
+    private void validateCurrentUser(User currentUser) {
+        if (currentUser == null) {
+            throw new AppException(ErrorCode.UNAUTHORIZED, "Access Denied: Missing or invalid authentication token.");
+        }
+    }
 
     private User fetchUserById(Long userId) {
         return userRepository.findById(userId)

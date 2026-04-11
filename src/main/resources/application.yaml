@@ -6,6 +6,8 @@ server:
 spring:
   application:
     name: lostandfound-app
+  profiles:
+    active: dev
 
   servlet:
     multipart:
@@ -45,7 +47,6 @@ spring:
     baseline-on-migrate: true
     validate-on-migrate: true
 
-  # CORRECT INDENTATION FOR MAIL
   mail:
     host: smtp.gmail.com
     port: 587
@@ -58,7 +59,6 @@ spring:
           starttls:
             enable: true
 
-  # CORRECT INDENTATION FOR OAUTH2
   security:
     oauth2:
       client:
@@ -72,6 +72,9 @@ spring:
             redirect-uri: "{baseUrl}/login/oauth2/code/google"
 
 app:
+  cookie:
+    domain: ${COOKIE_DOMAIN:}
+
   security:
     api-version: /api/v1
 
@@ -79,6 +82,7 @@ app:
       # --- Auth Module ---
       - /api/v1/auth/register
       - /api/v1/auth/login
+      - /api/v1/auth/google
       - /api/v1/auth/refresh
       - /api/v1/auth/reset-password
       - /api/v1/auth/reset-password/confirm
@@ -91,8 +95,6 @@ app:
       # --- Post Module (Future-Proofing) ---
       - /api/v1/posts          # Public post feed
       - /api/v1/posts/* # Public single post view
-      # Note: POST /api/v1/posts or PUT /api/v1/posts/* will still require auth
-      # because they won't have @CheckSecurity.Public on the controller!
 
       # --- System & OAuth2 ---
       - /swagger-ui/**
@@ -119,7 +121,7 @@ jwt:
   issuer: lostandfound-app
   secret: ${JWT_SECRET:your-super-secret-development-key-32-chars-min}
   expiration:
-    access-token: 90000000000     # 15 minutes in ms
+    access-token: 900000     # 15 minutes in ms
     refresh-token: 604800000 # 7 days in ms
 
 springdoc:

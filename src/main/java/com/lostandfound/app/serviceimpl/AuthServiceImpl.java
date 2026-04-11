@@ -1,5 +1,11 @@
 package com.lostandfound.app.serviceimpl;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.HttpTransport;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.JsonFactory;
+import com.google.api.client.json.gson.GsonFactory;
 import com.lostandfound.app.dto.request.AuthRequest.*;
 import com.lostandfound.app.dto.response.*;
 import com.lostandfound.app.exception.*;
@@ -20,8 +26,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -44,6 +53,19 @@ public class AuthServiceImpl extends BaseService implements AuthService {
     @Value("${PUBLIC_FRONTEND_URL:http://localhost:3000}")
     private String frontendUrl;
 
+    @Value("${spring.security.oauth2.client.registration.google.client-id}")
+    private String googleClientId;
+
+    private String generateVerificationCode() {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        StringBuilder code = new StringBuilder(6);
+        SecureRandom rnd = new SecureRandom();
+        for (int i = 0; i < 6; i++) {
+            code.append(chars.charAt(rnd.nextInt(chars.length())));
+        }
+        return code.toString();
+    }
+
     @Override
     @Transactional
     public UserResponse register(RegisterRequest request) {
@@ -64,8 +86,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
 
         User savedUser = userRepository.save(user);
 
-        // Verification Flow
-        String token = UUID.randomUUID().toString();
+        String token = generateVerificationCode();
         VerificationToken verificationToken = VerificationToken.builder()
                 .token(token)
                 .user(savedUser)
@@ -73,14 +94,14 @@ public class AuthServiceImpl extends BaseService implements AuthService {
                 .build();
         verificationTokenRepository.save(verificationToken);
 
-        emailService.sendVerificationEmail(savedUser.getEmail(), frontendUrl + "/verify-email?token=" + token);
+        emailService.sendVerificationEmail(savedUser.getEmail(), token);
         return mapToResponse(savedUser);
     }
 
     @Override
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new AppException(ErrorCode.AUTH_FAILED, "Invalid email or password"));
 
         if (user.getProvider() == AuthProvider.GOOGLE) {
             throw new AppException(ErrorCode.AUTH_FAILED, "Looks like you signed up with Google. Please use the 'Login with Google' button.");
@@ -113,8 +134,76 @@ public class AuthServiceImpl extends BaseService implements AuthService {
 
     @Override
     @Transactional
-    public AuthResponse refreshToken(TokenRefreshRequest request) {
-        RefreshToken newRefreshToken = refreshTokenService.rotateRefreshToken(request.refreshToken());
+    public AuthResponse googleLogin(String idTokenString) {
+        try {
+            HttpTransport transport = new NetHttpTransport();
+            JsonFactory jsonFactory = new GsonFactory();
+
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(transport, jsonFactory)
+                    .setAudience(Collections.singletonList(googleClientId))
+                    .build();
+
+            GoogleIdToken idToken = verifier.verify(idTokenString);
+            if (idToken == null) {
+                throw new AppException(ErrorCode.AUTH_FAILED, "Invalid Google ID token");
+            }
+
+            GoogleIdToken.Payload payload = idToken.getPayload();
+            String email = payload.getEmail();
+            String name = (String) payload.get("name");
+            String providerId = payload.getSubject();
+
+            Optional<User> userOptional = userRepository.findByEmail(email);
+            User user;
+
+            if (userOptional.isPresent()) {
+                user = userOptional.get();
+                if (user.getProvider() != AuthProvider.LOCAL && user.getProvider() != AuthProvider.GOOGLE) {
+                    // Failsafe catch
+                    throw new AppException(ErrorCode.AUTH_FAILED, "Account collision detected.");
+                } else if (user.getProvider() == AuthProvider.LOCAL) {
+                    throw new AppException(ErrorCode.AUTH_FAILED, "Email already registered with a password. Please login normally.");
+                }
+            } else {
+                user = User.builder()
+                        .email(email)
+                        .displayName(name)
+                        .provider(AuthProvider.GOOGLE)
+                        .providerId(providerId)
+                        .emailVerified(true)
+                        .isLocked(false)
+                        .role(Role.USER)
+                        .build();
+                user = userRepository.save(user);
+            }
+
+            if (Boolean.TRUE.equals(user.getIsLocked())) {
+                throw new AppException(ErrorCode.USER_LOCKED, "This account has been locked");
+            }
+
+            refreshTokenService.revokeByUser(user.getId());
+            String accessToken = jwtService.generateAccessToken(user);
+            RefreshToken refreshTokenEntity = refreshTokenService.createRefreshToken(user.getId());
+
+            return AuthResponse.builder()
+                    .accessToken(accessToken)
+                    .refreshToken(refreshTokenEntity.getRawToken())
+                    .expiresIn(jwtExpiration)
+                    .user(mapToResponse(user))
+                    .build();
+
+        } catch (AppException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Google verification failed", e);
+            throw new AppException(ErrorCode.AUTH_FAILED, "Could not verify Google account");
+        }
+    }
+
+    @Override
+    @Transactional
+    public AuthResponse refreshToken(String refreshTokenStr) {
+        RefreshToken newRefreshToken = refreshTokenService.rotateRefreshToken(refreshTokenStr);
         User user = newRefreshToken.getUser();
 
         if (Boolean.TRUE.equals(user.getIsLocked())) {
@@ -135,6 +224,10 @@ public class AuthServiceImpl extends BaseService implements AuthService {
     @Override
     @Transactional
     public void changePassword(User currentUser, ChangePasswordRequest request) {
+        if (currentUser == null) {
+            throw new AppException(ErrorCode.UNAUTHORIZED, "Access Denied: Missing or invalid authentication token.");
+        }
+
         User user = fetchUserById(currentUser.getId());
 
         if (user.getProvider() == AuthProvider.GOOGLE) {
@@ -214,10 +307,11 @@ public class AuthServiceImpl extends BaseService implements AuthService {
     @Override
     @Transactional
     public void resendVerificationEmail(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "User not found"));
+        User user = userRepository.findByEmail(email).orElse(null);
 
-        if (user.isEmailVerified() || user.getProvider() == AuthProvider.GOOGLE) return;
+        if (user == null || user.isEmailVerified() || user.getProvider() == AuthProvider.GOOGLE) {
+            return;
+        }
 
         verificationTokenRepository.deleteByUser_Id(user.getId());
 
@@ -229,7 +323,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
                 .build();
         verificationTokenRepository.save(verificationToken);
 
-        emailService.sendVerificationEmail(user.getEmail(), frontendUrl + "/verify-email?token=" + token);
+        emailService.sendVerificationEmail(user.getEmail(), token);
     }
 
     private User fetchUserById(Long userId) {
