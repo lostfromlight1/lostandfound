@@ -24,18 +24,22 @@ services:
     restart: unless-stopped
     depends_on:
       db:
-        # The app will NOT start until the DB healthcheck passes
         condition: service_healthy
     ports:
       - "${SERVER_PORT}:8080"
     environment:
-      # Connects using the internal Docker network name 'db'
-      DB_URL: jdbc:postgresql://db:5432/${DB_NAME}?stringtype=unspecified
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${DB_NAME}?stringtype=unspecified
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       API_KEY: ${API_KEY}
       SPRING_PROFILES_ACTIVE: dev
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      PUBLIC_FRONTEND_URL: ${PUBLIC_FRONTEND_URL}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
     volumes:
       - app_logs:/app/logs
       - ./uploads:/app/uploads
