@@ -1,5 +1,3 @@
-// src/main/java/com/lostandfound/app/controller/AuthController.java
-
 package com.lostandfound.app.controller;
 
 import com.lostandfound.app.annotation.ApiId;

@@ -8,9 +8,8 @@ import com.lostandfound.app.repository.CategoryRepository;
 import com.lostandfound.app.repository.PostRepository;
 import com.lostandfound.app.repository.UserRepository;
 import com.lostandfound.app.security.CustomUserDetails;
-import com.lostandfound.app.service.CustomUserDetailsService;
 import com.lostandfound.app.service.PostService;
-import com.lostandfound.app.utail.PostSpecification;
+import com.lostandfound.app.util.PostSpecification;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -22,9 +21,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 
-import java.math.BigDecimal;
 import java.util.List;
-import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
