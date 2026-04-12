@@ -25,16 +25,14 @@ public @interface CheckSecurity {
   public @interface Posts {
     @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.METHOD)
-    // Grants access if user is ADMIN OR if they own the specific post
-    @PreAuthorize("hasRole('ADMIN') or @authConfig.isPostOwner(#postId)")
+    @PreAuthorize("hasRole('ADMIN') or @authConfig.isPostOwner(#id)")
     public @interface canManage {}
   }
 
   public @interface Comments {
     @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.METHOD)
-    // Grants access if user is ADMIN OR if they own the specific comment
-    @PreAuthorize("hasRole('ADMIN') or @authConfig.isCommentOwner(#commentId)")
+    @PreAuthorize("hasRole('ADMIN') or @authConfig.isCommentOwner(#id)")
     public @interface canManage {}
   }
 }

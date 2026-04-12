@@ -2,6 +2,7 @@ package com.lostandfound.app.controller;
 
 import com.lostandfound.app.annotation.ApiId;
 import com.lostandfound.app.annotation.CheckSecurity;
+import com.lostandfound.app.annotation.CurrentUser;
 import com.lostandfound.app.dto.request.CommentRequest;
 import com.lostandfound.app.dto.response.BaseResponse;
 import com.lostandfound.app.dto.response.CommentResponse;
@@ -13,9 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,7 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/comments")
 @RequiredArgsConstructor
-@Tag(name = "3. Comment Management", description = "Endpoints for creating, updating, and managing comments on posts")
+@Tag(name = "4. Comment Management", description = "Endpoints for creating, updating, and managing comments on posts")
 public class CommentController {
 
     private final CommentService commentService;
@@ -34,11 +33,9 @@ public class CommentController {
     @Operation(summary = "Create Comment", description = "Allows an authenticated user to post a comment on a specific post.")
     public ResponseEntity<BaseResponse<CommentResponse>> create(
             @Valid @RequestBody CommentRequest.CreateComment request,
-            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails currentUser) {
+            @Parameter(hidden = true) @CurrentUser CustomUserDetails currentUser) {
 
-        log.info("REST request to create comment by user ID: {} for post ID: {}",
-                currentUser.getId(), request.postId());
-
+        log.info("REST request to create comment by user ID: {} for post ID: {}", currentUser.getId(), request.postId());
         CommentResponse response = commentService.createComment(request, currentUser);
         return BaseResponse.success("Comment created successfully", response);
     }
@@ -51,34 +48,33 @@ public class CommentController {
             @PathVariable Long postId) {
 
         log.info("REST request to get comments for post ID: {}", postId);
-
         List<CommentResponse> response = commentService.getCommentsByPost(postId);
         return BaseResponse.success("Comments fetched successfully", response);
     }
 
     @PutMapping("/{id}")
+    @CheckSecurity.Comments.canManage
     @ApiId("CMT-003")
     @Operation(summary = "Update Comment", description = "Updates the content of an existing comment. Only the author can update.")
     public ResponseEntity<BaseResponse<CommentResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody CommentRequest.UpdateComment request,
-            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails currentUser) {
+            @Parameter(hidden = true) @CurrentUser CustomUserDetails currentUser) {
 
         log.info("REST request to update comment ID: {} by user ID: {}", id, currentUser.getId());
-
         CommentResponse response = commentService.updateComment(id, request, currentUser);
         return BaseResponse.success("Comment updated successfully", response);
     }
 
     @DeleteMapping("/{id}")
+    @CheckSecurity.Comments.canManage
     @ApiId("CMT-004")
     @Operation(summary = "Delete Comment", description = "Soft deletes a comment. Only the author or an admin can delete.")
     public ResponseEntity<BaseResponse<Void>> delete(
             @PathVariable Long id,
-            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails currentUser) {
+            @Parameter(hidden = true) @CurrentUser CustomUserDetails currentUser) {
 
         log.info("REST request to delete comment ID: {} by user ID: {}", id, currentUser.getId());
-
         commentService.deleteComment(id, currentUser);
         return BaseResponse.success("Comment has been deleted successfully");
     }

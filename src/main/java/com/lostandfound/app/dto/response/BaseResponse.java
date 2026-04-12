@@ -16,7 +16,8 @@ import org.springframework.http.ResponseEntity;
 @AllArgsConstructor
 public class BaseResponse<T> {
 
-  @Builder.Default private LocalDateTime timestamp = LocalDateTime.now();
+  @Builder.Default
+  private LocalDateTime timestamp = LocalDateTime.now();
   private String apiId;
   private String traceId;
   private String message;
@@ -44,10 +45,10 @@ public class BaseResponse<T> {
   /** Constructs the response and automatically fills apiId and traceId from MDC */
   private static <T> BaseResponse<T> buildResponse(String message, T data) {
     return BaseResponse.<T>builder()
-        .apiId(Objects.toString(MDC.get("apiId"), "N/A"))
-        .traceId(Objects.toString(MDC.get("traceId"), "SYSTEM"))
-        .message(message)
-        .data(data)
-        .build();
+            .apiId(Objects.toString(MDC.get("apiId"), "N/A"))
+            .traceId(Objects.toString(MDC.get("traceId"), "SYSTEM"))
+            .message(message)
+            .data(data)
+            .build();
   }
 }

@@ -6,11 +6,21 @@ import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 public class PostRequest {
 
-        public record CreatePostRequest(
+        public record ImageRequest(
+                @NotBlank(message = "Image URL is required")
+                String url,
 
+                @NotBlank(message = "Image Public ID is required")
+                String publicId,
+
+                Integer sortOrder
+        ) {}
+
+        public record CreatePostRequest(
                 @NotBlank(message = "Title is required")
                 @Size(max = 255, message = "Title must be less than 255 characters")
                 String title,
@@ -21,7 +31,6 @@ public class PostRequest {
 
                 @NotNull(message = "Type is required")
                 PostType type,
-
 
                 PostStatus status,
 
@@ -37,33 +46,28 @@ public class PostRequest {
                 @Size(max = 255, message = "Contact info must be less than 255 characters")
                 String contactInfo,
 
-                BigDecimal reward
+                BigDecimal reward,
 
+                List<ImageRequest> images
         ) {}
 
-
-
         public record UpdatePostRequest(
-
                 @NotBlank(message = "Title is required")
-                @Size(max = 255)
+                @Size(max = 255, message = "Title must be less than 255 characters")
                 String title,
 
                 @NotBlank(message = "Description is required")
-                @Size(max = 2000)
+                @Size(max = 2000, message = "Description must be less than 2000 characters")
                 String description,
-
-                @NotNull(message = "Category is required")
-                Long categoryId,
-
 
                 @NotNull(message = "Type is required")
                 PostType type,
 
-                @NotNull(message = "Type is required")
+                @NotNull(message = "Status is required")
                 PostStatus status,
 
-
+                @NotNull(message = "Category is required")
+                Long categoryId,
 
                 @NotBlank(message = "Location is required")
                 String location,
@@ -71,10 +75,11 @@ public class PostRequest {
                 @NotNull(message = "Date is required")
                 LocalDate lostFoundDate,
 
-                @Size(max = 255)
+                @Size(max = 255, message = "Contact info must be less than 255 characters")
                 String contactInfo,
 
-                Double reward
+                BigDecimal reward,
 
+                List<ImageRequest> images
         ) {}
 }

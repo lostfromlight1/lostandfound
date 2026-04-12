@@ -62,6 +62,14 @@ public class GlobalExceptionHandler {
                 ErrorCode.VALIDATION_ERROR, request, "Parameter validation failed", errors);
     }
 
+    // NEW: Handles invalid Enum mapping (like bad City or Status names)
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<BaseErrorResponse> handleIllegalArgument(
+            IllegalArgumentException ex, HttpServletRequest request) {
+        return buildAndLogResponse(
+                ErrorCode.VALIDATION_ERROR, request, ex.getMessage(), null);
+    }
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<BaseErrorResponse> handleMaxUploadSizeExceededException(
             MaxUploadSizeExceededException ex, HttpServletRequest request) {

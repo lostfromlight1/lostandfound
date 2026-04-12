@@ -30,4 +30,6 @@ public interface UserService {
      * Locks a user account, preventing them from logging in or making requests.
      */
     void banUser(Long userId);
+
+    void unbanUser(Long userId);
 }

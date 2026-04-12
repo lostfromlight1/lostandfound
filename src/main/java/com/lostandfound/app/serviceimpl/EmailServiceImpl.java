@@ -1,5 +1,6 @@
 package com.lostandfound.app.serviceimpl;
 
+import com.lostandfound.app.service.BaseService;
 import com.lostandfound.app.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +12,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class EmailServiceImpl implements EmailService {
+public class EmailServiceImpl extends BaseService implements EmailService {
 
     private final JavaMailSender mailSender;
 
@@ -20,7 +21,7 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public void sendPasswordResetEmail(String to, String resetLink) {
-        log.info("Sending password reset email to: {}", to);
+        log.info("[{}] Preparing password reset email for: {}", getTraceId(), to);
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromEmail);
@@ -37,7 +38,7 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public void sendVerificationEmail(String to, String verificationCode) {
-        log.info("Sending email verification code to: {}", to);
+        log.info("[{}] Preparing email verification code for: {}", getTraceId(), to);
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromEmail);
@@ -56,9 +57,9 @@ public class EmailServiceImpl implements EmailService {
     private void sendEmail(SimpleMailMessage message, String to, String type) {
         try {
             mailSender.send(message);
-            log.info("{} email sent successfully to: {}", type, to);
+            log.info("[{}] {} email sent successfully to: {}", getTraceId(), type, to);
         } catch (Exception e) {
-            log.error("Failed to send {} email to {}: {}", type, to, e.getMessage());
+            log.error("[{}] Failed to send {} email to {}. Error: {}", getTraceId(), type, to, e.getMessage());
         }
     }
 }

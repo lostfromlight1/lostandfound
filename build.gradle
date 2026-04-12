@@ -43,6 +43,9 @@ dependencies {
     implementation "org.flywaydb:flyway-database-postgresql"
     runtimeOnly 'org.postgresql:postgresql'
 
+    // Cloudinary for Image Uploads
+    implementation 'com.cloudinary:cloudinary-http44:1.36.0'
+
     // API Documentation
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5'
 

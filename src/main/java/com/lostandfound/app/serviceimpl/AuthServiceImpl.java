@@ -69,6 +69,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
     @Override
     @Transactional
     public UserResponse register(RegisterRequest request) {
+        log.info("[{}] Attempting to register new user: {}", getTraceId(), request.email());
         if (userRepository.existsByEmail(request.email())) {
             throw new AppException(ErrorCode.EMAIL_ALREADY_IN_USE, "Email is already registered");
         }
@@ -95,11 +96,13 @@ public class AuthServiceImpl extends BaseService implements AuthService {
         verificationTokenRepository.save(verificationToken);
 
         emailService.sendVerificationEmail(savedUser.getEmail(), token);
+        log.info("[{}] Registration successful. Verification email sent to: {}", getTraceId(), savedUser.getEmail());
         return mapToResponse(savedUser);
     }
 
     @Override
     public AuthResponse login(LoginRequest request) {
+        log.info("[{}] Attempting login for email: {}", getTraceId(), request.email());
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new AppException(ErrorCode.AUTH_FAILED, "Invalid email or password"));
 
@@ -123,7 +126,9 @@ public class AuthServiceImpl extends BaseService implements AuthService {
 
         String accessToken = jwtService.generateAccessToken(user);
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getId());
-        log.info("User logged in successfully: {} (Role: {})", user.getEmail(), user.getRole());
+
+        log.info("[{}] User logged in successfully: {} (Role: {})", getTraceId(), user.getEmail(), user.getRole());
+
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken.getRawToken())
@@ -135,6 +140,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
     @Override
     @Transactional
     public AuthResponse googleLogin(String idTokenString) {
+        log.info("[{}] Attempting Google OAuth login", getTraceId());
         try {
             HttpTransport transport = new NetHttpTransport();
             JsonFactory jsonFactory = new GsonFactory();
@@ -153,16 +159,22 @@ public class AuthServiceImpl extends BaseService implements AuthService {
             String name = (String) payload.get("name");
             String providerId = payload.getSubject();
 
+            String pictureUrl = (String) payload.get("picture");
+
             Optional<User> userOptional = userRepository.findByEmail(email);
             User user;
 
             if (userOptional.isPresent()) {
                 user = userOptional.get();
                 if (user.getProvider() != AuthProvider.LOCAL && user.getProvider() != AuthProvider.GOOGLE) {
-                    // Failsafe catch
                     throw new AppException(ErrorCode.AUTH_FAILED, "Account collision detected.");
                 } else if (user.getProvider() == AuthProvider.LOCAL) {
                     throw new AppException(ErrorCode.AUTH_FAILED, "Email already registered with a password. Please login normally.");
+                }
+
+                if (user.getAvatarUrl() == null && pictureUrl != null) {
+                    user.setAvatarUrl(pictureUrl);
+                    userRepository.save(user);
                 }
             } else {
                 user = User.builder()
@@ -170,11 +182,13 @@ public class AuthServiceImpl extends BaseService implements AuthService {
                         .displayName(name)
                         .provider(AuthProvider.GOOGLE)
                         .providerId(providerId)
+                        .avatarUrl(pictureUrl)
                         .emailVerified(true)
                         .isLocked(false)
                         .role(Role.USER)
                         .build();
                 user = userRepository.save(user);
+                log.info("[{}] Created new user from Google OAuth: {}", getTraceId(), email);
             }
 
             if (Boolean.TRUE.equals(user.getIsLocked())) {
@@ -185,6 +199,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
             String accessToken = jwtService.generateAccessToken(user);
             RefreshToken refreshTokenEntity = refreshTokenService.createRefreshToken(user.getId());
 
+            log.info("[{}] Google login successful for: {}", getTraceId(), email);
             return AuthResponse.builder()
                     .accessToken(accessToken)
                     .refreshToken(refreshTokenEntity.getRawToken())
@@ -195,7 +210,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
         } catch (AppException e) {
             throw e;
         } catch (Exception e) {
-            log.error("Google verification failed", e);
+            log.error("[{}] Google verification failed", getTraceId(), e);
             throw new AppException(ErrorCode.AUTH_FAILED, "Could not verify Google account");
         }
     }
@@ -203,6 +218,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
     @Override
     @Transactional
     public AuthResponse refreshToken(String refreshTokenStr) {
+        log.info("[{}] Attempting to refresh token", getTraceId());
         RefreshToken newRefreshToken = refreshTokenService.rotateRefreshToken(refreshTokenStr);
         User user = newRefreshToken.getUser();
 
@@ -213,6 +229,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
 
         String accessToken = jwtService.generateAccessToken(user);
 
+        log.info("[{}] Token successfully refreshed for user: {}", getTraceId(), user.getEmail());
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(newRefreshToken.getRawToken())
@@ -240,11 +257,13 @@ public class AuthServiceImpl extends BaseService implements AuthService {
 
         user.setPassword(passwordEncoder.encode(request.newPassword()));
         userRepository.save(user);
+        log.info("[{}] Password successfully changed for user ID: {}", getTraceId(), user.getId());
     }
 
     @Override
     @Transactional
     public void resetPassword(String email) {
+        log.info("[{}] Processing password reset request for email: {}", getTraceId(), email);
         User user = userRepository.findByEmail(email).orElse(null);
         if (user == null || user.getProvider() == AuthProvider.GOOGLE) return;
 
@@ -263,6 +282,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
     @Override
     @Transactional
     public void confirmPasswordReset(String token, String newPassword) {
+        log.info("[{}] Processing password reset confirmation", getTraceId());
         PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
                 .orElseThrow(() -> new AppException(ErrorCode.TOKEN_INVALID, "Invalid password reset token."));
 
@@ -275,6 +295,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
         passwordResetTokenRepository.delete(resetToken);
+        log.info("[{}] Password successfully reset via token for user ID: {}", getTraceId(), user.getId());
     }
 
     @Override
@@ -282,14 +303,16 @@ public class AuthServiceImpl extends BaseService implements AuthService {
     public void logout(String refreshToken) {
         try {
             refreshTokenService.revokeToken(refreshToken);
+            log.info("[{}] User logged out and token revoked", getTraceId());
         } catch (Exception e) {
-            log.warn("Error revoking token during logout: {}", e.getMessage());
+            log.warn("[{}] Error revoking token during logout: {}", getTraceId(), e.getMessage());
         }
     }
 
     @Override
     @Transactional
     public void verifyEmail(String token) {
+        log.info("[{}] Attempting to verify email via token", getTraceId());
         VerificationToken verificationToken = verificationTokenRepository.findByToken(token)
                 .orElseThrow(() -> new AppException(ErrorCode.TOKEN_INVALID, "Invalid verification token."));
 
@@ -302,11 +325,13 @@ public class AuthServiceImpl extends BaseService implements AuthService {
         user.setEmailVerified(true);
         userRepository.save(user);
         verificationTokenRepository.delete(verificationToken);
+        log.info("[{}] Email verified successfully for user ID: {}", getTraceId(), user.getId());
     }
 
     @Override
     @Transactional
     public void resendVerificationEmail(String email) {
+        log.info("[{}] Attempting to resend verification email for: {}", getTraceId(), email);
         User user = userRepository.findByEmail(email).orElse(null);
 
         if (user == null || user.isEmailVerified() || user.getProvider() == AuthProvider.GOOGLE) {
@@ -324,6 +349,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
         verificationTokenRepository.save(verificationToken);
 
         emailService.sendVerificationEmail(user.getEmail(), token);
+        log.info("[{}] Resent verification email to: {}", getTraceId(), email);
     }
 
     private User fetchUserById(Long userId) {
@@ -338,6 +364,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
                 .displayName(user.getDisplayName())
                 .contactInfo(user.getContactInfo())
                 .role(user.getRole())
+                .avatarUrl(user.getAvatarUrl()) // <-- NEW!
                 .build();
     }
 }
