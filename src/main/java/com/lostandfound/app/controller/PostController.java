@@ -6,6 +6,7 @@ import com.lostandfound.app.dto.request.PostRequest;
 import com.lostandfound.app.dto.response.BaseResponse;
 import com.lostandfound.app.dto.response.PageResponse;
 import com.lostandfound.app.dto.response.PostResponse;
+import com.lostandfound.app.model.MyanmarCity;
 import com.lostandfound.app.model.PostType;
 import com.lostandfound.app.security.CustomUserDetails;
 import com.lostandfound.app.service.PostService;
@@ -45,18 +46,28 @@ public class PostController {
         return BaseResponse.created("update post successful", response);
     }
 
-    @GetMapping
-    public ResponseEntity<BaseResponse<PageResponse<PostResponse.PostDto>>> getAll(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "5") int size,
-            @RequestParam(required = false) PostType type
+  @GetMapping
+public ResponseEntity<BaseResponse<PageResponse<PostResponse.PostDto>>> getAll(
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "5") int size,
+        @RequestParam(required = false) PostType type,
+        @RequestParam(required = false) Long categoryId,
+        @RequestParam(required = false) MyanmarCity location
+) {
+          PageResponse<PostResponse.PostDto> response=postService.getAll(page, size, type, categoryId, location);
+
+          return BaseResponse.success("Fetch Post Successful",response);
+
+}
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<BaseResponse<Void>> deletePost(
+            @PathVariable Long id,
+            @CurrentUser CustomUserDetails user
     ) {
-
-        PageResponse<PostResponse.PostDto> response=postService.getAll(page, size, type);
-
-        return BaseResponse.success("Fetching Post Successful",response);
+        postService.deletePost(id, user);
+        return BaseResponse.success("Post deleted successfully");
     }
-
 
 
 

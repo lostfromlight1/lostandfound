@@ -21,79 +21,74 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+
 @Slf4j
 @Configuration
 @EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-//  private final JwtAuthenticationFilter jwtAuthFilter;
-//  private final TraceIdFilter traceIdFilter;
-//  private final CustomAuthenticationEntryPoint authEntryPoint;
-  private final RestAccessDeniedHandler accessDeniedHandler;
-  private final SecurityProperties securityProperties;
+    private final JwtAuthenticationFilter jwtAuthFilter;
+    private final TraceIdFilter traceIdFilter;
+    private final ApiKeyFilter apiKeyFilter;
+//    private final CustomAuthenticationEntryPoint authEntryPoint;
+    private final RestAccessDeniedHandler accessDeniedHandler;
+    private final SecurityProperties securityProperties;
 
-  @Bean
-  PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
-  }
+    @Bean
+    PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
-  @Bean
-  AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-    return config.getAuthenticationManager();
-  }
+    @Bean
+    AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
 
-  @Bean
-  SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-    log.info("Applying Security Filter Chain configurations...");
+    @Bean
+    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        log.info("Applying Security Filter Chain configurations...");
 
-    String[] publicRoutes = securityProperties.publicRoutes().toArray(new String[0]);
+        String[] publicRoutes = securityProperties.publicRoutes().toArray(new String[0]);
 
-    http.csrf(AbstractHttpConfigurer::disable)
-        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-        .sessionManagement(
-            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .exceptionHandling(
-            ex -> {
-//              ex.authenticationEntryPoint(authEntryPoint);
-              ex.accessDeniedHandler(accessDeniedHandler);
-            })
-        .authorizeHttpRequests(
-            auth ->
-                auth
-                    // 1. Allow the routes defined in application.yml
-                    .requestMatchers(publicRoutes)
-                    .permitAll()
+        http.csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(ex -> {
+//                    ex.authenticationEntryPoint(authEntryPoint);
+                    ex.accessDeniedHandler(accessDeniedHandler);
+                })
+                .authorizeHttpRequests(auth -> auth
 
-                    // 2. Allow ALL public GET requests for articles (Search List & Raw Images)
-                    .requestMatchers(HttpMethod.GET, "/api/v1/articles/**")
-                    .permitAll()
+                        .requestMatchers(publicRoutes).permitAll()
 
-                    // 3. Everything else (including POST, PUT, DELETE to articles) requires a token
-                    .anyRequest()
-                    .authenticated());
+                        .requestMatchers(HttpMethod.GET, "/api/v1/articles/**").permitAll()
 
-//    http.addFilterBefore(traceIdFilter, UsernamePasswordAuthenticationFilter.class);
-//
-//    http.addFilterAfter(jwtAuthFilter, TraceIdFilter.class);
+                        .anyRequest().authenticated()
+                );
 
-    return http.build();
-  }
 
-  @Bean
-  CorsConfigurationSource corsConfigurationSource() {
-    CorsConfiguration config = new CorsConfiguration();
-    var corsProps = securityProperties.cors();
+        http.addFilterBefore(traceIdFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterAfter(apiKeyFilter, TraceIdFilter.class);
+        http.addFilterAfter(jwtAuthFilter, ApiKeyFilter.class);
 
-    config.setAllowedOrigins(corsProps.allowedOrigins());
-    config.setAllowedMethods(corsProps.allowedMethods());
-    config.setAllowedHeaders(corsProps.allowedHeaders());
-    config.setExposedHeaders(corsProps.exposedHeaders());
+        return http.build();
+    }
 
-    config.setAllowCredentials(true);
+    @Bean
+    CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        var corsProps = securityProperties.cors();
 
-    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/**", config);
-    return source;
-  }
+        config.setAllowedOrigins(corsProps.allowedOrigins());
+        config.setAllowedMethods(corsProps.allowedMethods());
+        config.setAllowedHeaders(corsProps.allowedHeaders());
+        config.setExposedHeaders(corsProps.exposedHeaders());
+
+        config.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
 }

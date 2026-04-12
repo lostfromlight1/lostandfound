@@ -10,6 +10,8 @@ import com.lostandfound.app.repository.UserRepository;
 import com.lostandfound.app.security.CustomUserDetails;
 import com.lostandfound.app.service.CustomUserDetailsService;
 import com.lostandfound.app.service.PostService;
+import com.lostandfound.app.utail.PostSpecification;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +20,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -43,7 +46,7 @@ public class PostServiceImpl implements PostService {
         post.setTitle(request.title());
         post.setDescription(request.description());
         post.setPostType(request.type());
-        post.setLocation(request.location());
+        post.setLocation(MyanmarCity.valueOf(request.location().toUpperCase()));
         post.setLostFoundDate(request.lostFoundDate());
         post.setContactInfo(request.contactInfo());
         post.setReward(request.reward());
@@ -78,7 +81,7 @@ public class PostServiceImpl implements PostService {
         post.setDescription(request.description());
         post.setPostType(request.type());
         post.setStatus(request.status());
-        post.setLocation(request.location());
+        post.setLocation(MyanmarCity.valueOf(request.location().toUpperCase()));;
         post.setContactInfo(request.contactInfo());
         post.setLostFoundDate(request.lostFoundDate());
         post.setCategory(category);
@@ -88,24 +91,29 @@ public class PostServiceImpl implements PostService {
         return mapToDto(post);
 
     }
-
-    @Transactional(readOnly=true)
+    @Transactional(readOnly = true)
     @Override
-    public PageResponse<PostResponse.PostDto> getAll(int page, int size, PostType type) {
+    public PageResponse<PostResponse.PostDto> getAll(
+            int page,
+            int size,
+            PostType type,
+            Long categoryId,
+            MyanmarCity location
+    ) {
+
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
-        Page<Post> postPage;
+        Specification<Post> spec = Specification
+                .where(PostSpecification.hasType(type))
+                .and(PostSpecification.hasCategory(categoryId))
+                .and(PostSpecification.hasLocation(location));
 
-        // ✅ filter or not
-        if (type != null) {
-            postPage = postRepository.findByPostTypeWithUserAndCategory(type, pageable);
-        } else {
-            postPage = postRepository.findAll(pageable);
-        }
+        Page<Post> postPage = postRepository.findAll(spec, pageable);
 
+        // ✅ FIX HERE
         List<PostResponse.PostDto> content = postPage.getContent()
                 .stream()
-                .map(this::mapToDto)
+                .map(this::mapToDto) // map Post → PostDto
                 .toList();
 
         return new PageResponse<>(
@@ -117,6 +125,23 @@ public class PostServiceImpl implements PostService {
         );
     }
 
+    @Transactional
+    @Override
+    public void deletePost(Long id, CustomUserDetails userDetails) {
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Post not found"));
+
+        // ✅ ownership check
+        if (!post.getUser().getId().equals(userDetails.getId())) {
+            throw new RuntimeException("You are not allowed to delete this post");
+        }
+
+        // ✅ soft delete
+        post.softDelete();
+
+        postRepository.save(post);
+    }
+
 
     // 🔄 mapper
     private PostResponse.PostDto mapToDto(Post post) {
@@ -126,7 +151,7 @@ public class PostServiceImpl implements PostService {
                 post.getDescription(),
                 post.getPostType(),
                 post.getStatus(),
-                post.getLocation(),
+                post.getLocation().name(),
                 post.getLostFoundDate(),
                 post.getContactInfo(),
                 post.getReward(),

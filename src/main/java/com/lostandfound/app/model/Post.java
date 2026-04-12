@@ -4,7 +4,9 @@ package com.lostandfound.app.model;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -13,9 +15,11 @@ import java.util.List;
 
 @Entity
 @Data
+@EqualsAndHashCode(callSuper = false)
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "posts")
+@SQLRestriction("is_active = true")
 public class Post extends BaseEntity {
 
     @Id
@@ -34,7 +38,8 @@ public class Post extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private PostStatus status;
 
-    private String location;
+    @Enumerated(EnumType.STRING)
+    private MyanmarCity location;
 
     private LocalDate lostFoundDate;
 

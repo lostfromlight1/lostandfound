@@ -1,18 +1,22 @@
+// src/main/java/com/lostandfound/app/controller/AuthController.java
+
 package com.lostandfound.app.controller;
 
 import com.lostandfound.app.annotation.ApiId;
 import com.lostandfound.app.dto.request.AuthRequest.ChangePasswordRequest;
 import com.lostandfound.app.dto.request.AuthRequest.ConfirmPasswordResetRequest;
+import com.lostandfound.app.dto.request.AuthRequest.GoogleLoginRequest;
 import com.lostandfound.app.dto.request.AuthRequest.LoginRequest;
 import com.lostandfound.app.dto.request.AuthRequest.RegisterRequest;
 import com.lostandfound.app.dto.response.AuthResponse;
 import com.lostandfound.app.dto.response.BaseResponse;
 import com.lostandfound.app.dto.response.UserResponse;
-import com.lostandfound.app.dto.request.AuthRequest.TokenRefreshRequest;
 import com.lostandfound.app.model.User;
 import com.lostandfound.app.annotation.CheckSecurity;
 import com.lostandfound.app.annotation.CurrentUser;
 import com.lostandfound.app.service.AuthService;
+import com.lostandfound.app.exception.AppException;
+import com.lostandfound.app.exception.ErrorCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,7 +32,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Value;
 
-
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -37,11 +40,18 @@ import org.springframework.beans.factory.annotation.Value;
 public class AuthController {
 
     private final AuthService authService;
+
     @Value("${jwt.expiration.access-token}")
     private long accessTokenDurationMs;
 
     @Value("${jwt.expiration.refresh-token}")
     private long refreshTokenDurationMs;
+
+    @Value("${spring.profiles.active:dev}")
+    private String activeProfile;
+
+    @Value("${app.cookie.domain:}")
+    private String cookieDomain;
 
     @PostMapping("/register")
     @CheckSecurity.Public.canRead
@@ -63,14 +73,31 @@ public class AuthController {
         return BaseResponse.success("Login successful", authData);
     }
 
+    @PostMapping("/google")
+    @CheckSecurity.Public.canRead
+    @ApiId("AUTH-010")
+    public ResponseEntity<BaseResponse<AuthResponse>> googleLogin(
+            @Valid @RequestBody GoogleLoginRequest request,
+            HttpServletResponse response) {
+
+        AuthResponse authData = authService.googleLogin(request.idToken());
+        setTokenCookies(response, authData.accessToken(), authData.refreshToken());
+
+        return BaseResponse.success("Google login successful", authData);
+    }
+
     @PostMapping("/refresh")
     @CheckSecurity.Public.canRead
     @ApiId("AUTH-003")
     public ResponseEntity<BaseResponse<AuthResponse>> refreshToken(
-            @Valid @RequestBody TokenRefreshRequest request,
+            @CookieValue(name = "app_refresh_token", required = false) String refreshTokenString,
             HttpServletResponse response) {
 
-        AuthResponse authData = authService.refreshToken(request);
+        if (refreshTokenString == null || refreshTokenString.isBlank()) {
+            throw new AppException(ErrorCode.AUTH_FAILED, "Refresh token is missing or expired");
+        }
+
+        AuthResponse authData = authService.refreshToken(refreshTokenString);
         setTokenCookies(response, authData.accessToken(), authData.refreshToken());
 
         return BaseResponse.success("Token refreshed successfully", authData);
@@ -81,6 +108,12 @@ public class AuthController {
     public ResponseEntity<BaseResponse<Void>> changePassword(
             @Parameter(hidden = true) @CurrentUser User currentUser,
             @Valid @RequestBody ChangePasswordRequest request) {
+
+        // CRITICAL FIX: Ensure user is authenticated
+        if (currentUser == null) {
+            throw new AppException(ErrorCode.UNAUTHORIZED, "Access Denied: Missing or invalid authentication token.");
+        }
+
         authService.changePassword(currentUser, request);
         return BaseResponse.success("Password changed successfully");
     }
@@ -114,7 +147,7 @@ public class AuthController {
     @ApiId("AUTH-008")
     public ResponseEntity<BaseResponse<Void>> resendVerificationEmail(@RequestParam @Email @NotBlank String email) {
         authService.resendVerificationEmail(email);
-        return BaseResponse.success("If the email is registered and unverified, a new link has been sent.");
+        return BaseResponse.success("If the email is registered and unverified, a new code has been sent.");
     }
 
     @PostMapping("/logout")
@@ -122,43 +155,65 @@ public class AuthController {
     @Operation(summary = "User Logout", description = "Revokes refresh token and clears HttpOnly cookies.")
     public ResponseEntity<BaseResponse<Void>> logout(
             @Parameter(hidden = true) @CurrentUser User currentUser,
-            @CookieValue(name = "refreshToken", required = false) String refreshTokenString,
+            @CookieValue(name = "app_refresh_token", required = false) String refreshTokenString,
             HttpServletResponse response) {
 
         if (refreshTokenString != null && !refreshTokenString.isBlank()) {
             authService.logout(refreshTokenString);
         }
 
-        ResponseCookie clearAccess = ResponseCookie.from("accessToken", "")
-                .httpOnly(true).secure(true).path("/").maxAge(0).build();
-        ResponseCookie clearRefresh = ResponseCookie.from("refreshToken", "")
-                .httpOnly(true).secure(true).path("/").maxAge(0).build();
+        boolean isProduction = "prod".equalsIgnoreCase(activeProfile);
+        String sameSitePolicy = isProduction ? "None" : "Lax";
 
-        response.addHeader(HttpHeaders.SET_COOKIE, clearAccess.toString());
-        response.addHeader(HttpHeaders.SET_COOKIE, clearRefresh.toString());
+        ResponseCookie.ResponseCookieBuilder clearAccessBuilder = ResponseCookie.from("app_access_token", "")
+                .httpOnly(true)
+                .secure(isProduction)
+                .path("/")
+                .sameSite(sameSitePolicy)
+                .maxAge(0);
+
+        ResponseCookie.ResponseCookieBuilder clearRefreshBuilder = ResponseCookie.from("app_refresh_token", "")
+                .httpOnly(true)
+                .secure(isProduction)
+                .path("/")
+                .sameSite(sameSitePolicy)
+                .maxAge(0);
+
+        if (isProduction && cookieDomain != null && !cookieDomain.isBlank()) {
+            clearAccessBuilder.domain(cookieDomain);
+            clearRefreshBuilder.domain(cookieDomain);
+        }
+
+        response.addHeader(HttpHeaders.SET_COOKIE, clearAccessBuilder.build().toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, clearRefreshBuilder.build().toString());
 
         return BaseResponse.success("Successfully logged out");
     }
-    // ---------------------- Helper Method ----------------------
 
     private void setTokenCookies(HttpServletResponse response, String accessToken, String refreshToken) {
-        ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
+        boolean isProduction = "prod".equalsIgnoreCase(activeProfile);
+        String sameSitePolicy = isProduction ? "None" : "Lax";
+
+        ResponseCookie.ResponseCookieBuilder accessCookieBuilder = ResponseCookie.from("app_access_token", accessToken)
                 .httpOnly(true)
-                .secure(true)
+                .secure(isProduction)
                 .path("/")
                 .maxAge(accessTokenDurationMs / 1000)
-                .sameSite("Lax")
-                .build();
+                .sameSite(sameSitePolicy);
 
-        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
+        ResponseCookie.ResponseCookieBuilder refreshCookieBuilder = ResponseCookie.from("app_refresh_token", refreshToken)
                 .httpOnly(true)
-                .secure(true)
+                .secure(isProduction)
                 .path("/")
                 .maxAge(refreshTokenDurationMs / 1000)
-                .sameSite("Lax")
-                .build();
+                .sameSite(sameSitePolicy);
 
-        response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
-        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
+        if (isProduction && cookieDomain != null && !cookieDomain.isBlank()) {
+            accessCookieBuilder.domain(cookieDomain);
+            refreshCookieBuilder.domain(cookieDomain);
+        }
+
+        response.addHeader(HttpHeaders.SET_COOKIE, accessCookieBuilder.build().toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookieBuilder.build().toString());
     }
 }

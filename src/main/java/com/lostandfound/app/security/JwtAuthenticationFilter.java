@@ -1,12 +1,15 @@
+// src/main/java/com/lostandfound/app/security/JwtAuthenticationFilter.java
+
 package com.lostandfound.app.security;
 
+import com.lostandfound.app.model.User;
+import com.lostandfound.app.repository.UserRepository;
 import com.lostandfound.app.service.CustomUserDetailsService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +31,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final CustomUserDetailsService userDetailsService;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(
@@ -38,7 +42,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String jwt = extractTokenFromHeader(request);
         if (jwt == null) {
-            jwt = extractTokenFromCookie(request, "accessToken");
+            jwt = extractTokenFromCookie(request);
         }
 
         if (jwt == null) {
@@ -55,11 +59,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 request.setAttribute("exception", "invalid_token_type");
             }
             else if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                // 1. Load UserDetails for JWT validation
                 UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
 
                 if (jwtService.isTokenValid(jwt, userDetails)) {
-                    setAuthentication(request, userDetails);
-                    log.debug("[{}] User '{}' authenticated for {}", jwtService.getTraceId(), userDetails.getUsername(), request.getRequestURI());
+                    // 2. CRITICAL FIX: Fetch the actual User entity from the DB
+                    User actualUserEntity = userRepository.findByEmail(userEmail).orElse(null);
+
+                    if (actualUserEntity != null) {
+                        // 3. Pass the actual entity as the Principal so @CurrentUser works!
+                        setAuthentication(request, actualUserEntity, userDetails);
+                        log.debug("[{}] User '{}' authenticated for {}", jwtService.getTraceId(), userDetails.getUsername(), request.getRequestURI());
+                    }
                 }
             }
         } catch (ExpiredJwtException e) {
@@ -81,19 +92,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return (header != null && header.startsWith("Bearer ")) ? header.substring(7) : null;
     }
 
-    private String extractTokenFromCookie(HttpServletRequest request, String cookieName) {
-        if (request.getCookies() != null) {
-            for (Cookie cookie : request.getCookies()) {
-                if (cookieName.equals(cookie.getName())) {
-                    return cookie.getValue();
-                }
-            }
+    private String extractTokenFromCookie(HttpServletRequest request) {
+        if (request.getCookies() == null) {
+            return null;
         }
-        return null;
+
+        return java.util.Arrays.stream(request.getCookies())
+                .filter(cookie -> "app_access_token".equals(cookie.getName()))
+                .map(jakarta.servlet.http.Cookie::getValue)
+                .findFirst()
+                .orElse(null);
     }
 
-    private void setAuthentication(HttpServletRequest request, UserDetails user) {
-        var authToken = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+    private void setAuthentication(HttpServletRequest request, User actualUserEntity, UserDetails userDetails) {
+        var authToken = new UsernamePasswordAuthenticationToken(actualUserEntity, null, userDetails.getAuthorities());
         authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         SecurityContextHolder.getContext().setAuthentication(authToken);
     }
