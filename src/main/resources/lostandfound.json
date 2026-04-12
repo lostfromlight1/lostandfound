@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "LostAndFound API",
-    "description": "Complete API testing suite for the Lost & Found application.",
+    "name": "LostAndFound API - Full Suite",
+    "description": "Complete API testing suite including Auth, Users, Posts, Comments, Images, and Categories.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -9,7 +9,10 @@
     { "key": "api_key", "value": "your-default-dev-key" },
     { "key": "access_token", "value": "" },
     { "key": "refresh_token", "value": "" },
-    { "key": "user_id", "value": "1" }
+    { "key": "user_id", "value": "1" },
+    { "key": "post_id", "value": "1" },
+    { "key": "comment_id", "value": "1" },
+    { "key": "category_id", "value": "1" }
   ],
   "item": [
     {
@@ -23,7 +26,7 @@
               { "key": "X-API-KEY", "value": "{{api_key}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "url": { "raw": "{{baseUrl}}/api/v1/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "register"] },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/register" },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"Password123!\",\n  \"displayName\": \"Test User\",\n  \"contactInfo\": \"123-456-7890\"\n}"
@@ -51,7 +54,7 @@
               { "key": "X-API-KEY", "value": "{{api_key}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "url": { "raw": "{{baseUrl}}/api/v1/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "login"] },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/login" },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"Password123!\"\n}"
@@ -59,107 +62,30 @@
           }
         },
         {
-          "name": "Verify Email",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "X-API-KEY", "value": "{{api_key}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/verify-email?token=paste-verification-token-here",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "verify-email"],
-              "query": [ { "key": "token", "value": "paste-verification-token-here" } ]
-            }
-          }
-        },
-        {
-          "name": "Resend Verification Email",
+          "name": "Google Login",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "X-API-KEY", "value": "{{api_key}}" }
+              { "key": "X-API-KEY", "value": "{{api_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
             ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/resend-verification?email=test@example.com",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "resend-verification"],
-              "query": [ { "key": "email", "value": "test@example.com" } ]
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/google" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idToken\": \"google-oauth-token-here\"\n}"
             }
           }
         },
         {
           "name": "Refresh Token",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "var jsonData = pm.response.json();",
-                  "if(jsonData.payload && jsonData.payload.accessToken) { pm.collectionVariables.set('access_token', jsonData.payload.accessToken); }",
-                  "if(jsonData.payload && jsonData.payload.refreshToken) { pm.collectionVariables.set('refresh_token', jsonData.payload.refreshToken); }"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
+          "description": "Note: Controller uses CookieValue 'app_refresh_token'",
           "request": {
             "method": "POST",
             "header": [
               { "key": "X-API-KEY", "value": "{{api_key}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              { "key": "Cookie", "value": "app_refresh_token={{refresh_token}}" }
             ],
-            "url": { "raw": "{{baseUrl}}/api/v1/auth/refresh", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "refresh"] },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}"
-            }
-          }
-        },
-        {
-          "name": "Change Password",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "X-API-KEY", "value": "{{api_key}}" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "url": { "raw": "{{baseUrl}}/api/v1/auth/change-password", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "change-password"] },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"oldPassword\": \"Password123!\",\n  \"newPassword\": \"NewPassword123!\"\n}"
-            }
-          }
-        },
-        {
-          "name": "Reset Password Request",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "X-API-KEY", "value": "{{api_key}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/reset-password?email=test@example.com",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "reset-password"],
-              "query": [ { "key": "email", "value": "test@example.com" } ]
-            }
-          }
-        },
-        {
-          "name": "Confirm Password Reset",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "X-API-KEY", "value": "{{api_key}}" },
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "url": { "raw": "{{baseUrl}}/api/v1/auth/reset-password/confirm", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "reset-password", "confirm"] },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"token\": \"paste-uuid-from-email-here\",\n  \"newPassword\": \"NewPassword123!\"\n}"
-            }
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/refresh" }
           }
         },
         {
@@ -168,9 +94,10 @@
             "method": "POST",
             "header": [
               { "key": "X-API-KEY", "value": "{{api_key}}" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Cookie", "value": "app_refresh_token={{refresh_token}}" }
             ],
-            "url": { "raw": "{{baseUrl}}/api/v1/auth/logout", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "logout"] }
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/logout" }
           }
         }
       ]
@@ -180,29 +107,78 @@
       "item": [
         {
           "name": "Get My Profile",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "var jsonData = pm.response.json();",
-                  "if(jsonData.payload && jsonData.payload.id) { pm.collectionVariables.set('user_id', jsonData.payload.id); }"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
           "request": {
             "method": "GET",
             "header": [
               { "key": "X-API-KEY", "value": "{{api_key}}" },
               { "key": "Authorization", "value": "Bearer {{access_token}}" }
             ],
-            "url": { "raw": "{{baseUrl}}/api/v1/users/me", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users", "me"] }
+            "url": { "raw": "{{baseUrl}}/api/v1/users/me" }
           }
         },
         {
-          "name": "Update My Profile",
+          "name": "ADMIN: Unban User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-API-KEY", "value": "{{api_key}}" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/v1/users/{{user_id}}/unban" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Post Management",
+      "item": [
+        {
+          "name": "Create Post",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if(jsonData.payload && jsonData.payload.id) { pm.collectionVariables.set('post_id', jsonData.payload.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-API-KEY", "value": "{{api_key}}" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/v1/posts/create" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Lost Wallet\",\n  \"description\": \"Brown leather wallet lost near downtown.\",\n  \"type\": \"LOST\",\n  \"categoryId\": 1,\n  \"location\": \"YANGON\",\n  \"imageUrls\": []\n}"
+            }
+          }
+        },
+        {
+          "name": "Get All Posts",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-API-KEY", "value": "{{api_key}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/posts?page=0&size=5&type=LOST",
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "5" },
+                { "key": "type", "value": "LOST" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Post",
           "request": {
             "method": "PUT",
             "header": [
@@ -210,64 +186,130 @@
               { "key": "Authorization", "value": "Bearer {{access_token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "url": { "raw": "{{baseUrl}}/api/v1/users/update", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users", "update"] },
+            "url": { "raw": "{{baseUrl}}/api/v1/posts/{{post_id}}" },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"displayName\": \"Updated Tester Name\",\n  \"contactInfo\": \"updated@example.com\"\n}"
+              "raw": "{\n  \"title\": \"Updated Title\",\n  \"description\": \"Updated Description\"\n}"
             }
           }
         },
         {
-          "name": "Get Public Profile",
+          "name": "Delete Post",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "X-API-KEY", "value": "{{api_key}}" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/v1/posts/{{post_id}}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Comment Management",
+      "item": [
+        {
+          "name": "Create Comment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if(jsonData.payload && jsonData.payload.id) { pm.collectionVariables.set('comment_id', jsonData.payload.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-API-KEY", "value": "{{api_key}}" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/v1/comments" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"postId\": {{post_id}},\n  \"content\": \"I might have seen this!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Comments by Post",
           "request": {
             "method": "GET",
             "header": [
               { "key": "X-API-KEY", "value": "{{api_key}}" }
             ],
-            "url": { "raw": "{{baseUrl}}/api/v1/users/{{user_id}}/profile", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users", "{{user_id}}", "profile"] }
+            "url": { "raw": "{{baseUrl}}/api/v1/comments/post/{{post_id}}" }
           }
-        },
+        }
+      ]
+    },
+    {
+      "name": "5. Image Management",
+      "item": [
         {
-          "name": "ADMIN: Get All Users",
+          "name": "Upload Image",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-API-KEY", "value": "{{api_key}}" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/v1/images/upload" },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": [] }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Category Management",
+      "item": [
+        {
+          "name": "Get All Categories",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "X-API-KEY", "value": "{{api_key}}" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              { "key": "X-API-KEY", "value": "{{api_key}}" }
             ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/users?page=0&size=20",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users"],
-              "query": [ { "key": "page", "value": "0" }, { "key": "size", "value": "20" } ]
-            }
+            "url": { "raw": "{{baseUrl}}/api/v1/categories" }
           }
         },
         {
-          "name": "ADMIN: Search Users",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "X-API-KEY", "value": "{{api_key}}" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/users/search?query=test&page=0&size=20",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users", "search"],
-              "query": [ { "key": "query", "value": "test" }, { "key": "page", "value": "0" }, { "key": "size", "value": "20" } ]
+          "name": "ADMIN: Create Category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if(jsonData.payload && jsonData.payload.id) { pm.collectionVariables.set('category_id', jsonData.payload.id); }"
+                ],
+                "type": "text/javascript"
+              }
             }
-          }
-        },
-        {
-          "name": "ADMIN: Ban User",
+          ],
           "request": {
-            "method": "PUT",
+            "method": "POST",
             "header": [
               { "key": "X-API-KEY", "value": "{{api_key}}" },
-              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
             ],
-            "url": { "raw": "{{baseUrl}}/api/v1/users/{{user_id}}/ban", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users", "{{user_id}}", "ban"] }
+            "url": { "raw": "{{baseUrl}}/api/v1/categories" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Electronics\"\n}"
+            }
           }
         }
       ]
