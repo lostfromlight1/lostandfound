@@ -1,4 +1,4 @@
-package com.lostandfound.app.utail;
+package com.lostandfound.app.util;
 
 import com.lostandfound.app.model.MyanmarCity;
 import com.lostandfound.app.model.Post;

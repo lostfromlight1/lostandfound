@@ -1,6 +1,5 @@
 package com.lostandfound.app.model;
 
-
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -31,7 +30,6 @@ public class Post extends BaseEntity {
     @Column(length = 2000)
     private String description;
 
-
     @Enumerated(EnumType.STRING)
     private PostType postType;
 
@@ -58,5 +56,11 @@ public class Post extends BaseEntity {
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Comment> comments = new ArrayList<>();
 
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PostImage> images = new ArrayList<>();
 
+    public void addImage(PostImage image) {
+        images.add(image);
+        image.setPost(this);
+    }
 }

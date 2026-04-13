@@ -96,6 +96,9 @@ app:
       - /api/v1/posts          # Public post feed
       - /api/v1/posts/* # Public single post view
 
+      # --- Image Module ---
+      - /api/v1/images/upload
+
       # --- System & OAuth2 ---
       - /swagger-ui/**
       - /swagger-ui.html
@@ -153,3 +156,9 @@ logging:
     com.lostandfound: INFO
     org.springframework.web: INFO
     org.hibernate.SQL: ERROR
+
+# --- Cloudinary Configuration ---
+cloudinary:
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:your_cloud_name_here}
+  api-key: ${CLOUDINARY_API_KEY:your_api_key_here}
+  api-secret: ${CLOUDINARY_API_SECRET:your_api_secret_here}

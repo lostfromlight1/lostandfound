@@ -12,6 +12,7 @@ import com.lostandfound.app.repository.PostRepository;
 import com.lostandfound.app.repository.UserRepository;
 import com.lostandfound.app.security.CustomUserDetails;
 import com.lostandfound.app.service.CommentService;
+import org.slf4j.MDC;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -32,7 +34,7 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public CommentResponse createComment(CommentRequest.CreateComment request, CustomUserDetails currentUser) {
-        log.debug("Creating comment for post ID: {} by user ID: {}", request.postId(), currentUser.getId());
+        log.info("[{}] Creating comment for post ID: {} by user ID: {}", getTraceId(), request.postId(), currentUser.getId());
 
         Post post = postRepository.findById(request.postId())
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND,
@@ -40,22 +42,29 @@ public class CommentServiceImpl implements CommentService {
 
         User user = userRepository.getReferenceById(currentUser.getId());
 
-        Comment comment = Comment.builder()
-                .content(request.content())
-                .post(post)
-                .user(user)
-                .build();
+        try {
+            Comment comment = Comment.builder()
+                    .content(request.content())
+                    .post(post)
+                    .user(user)
+                    .imageUrl(request.imageUrl())
+                    .imagePublicId(request.imagePublicId())
+                    .build();
 
-        Comment savedComment = commentRepository.save(comment);
-        log.info("Comment ID: {} created successfully", savedComment.getId());
+            Comment savedComment = commentRepository.save(comment);
+            log.info("[{}] Comment ID: {} created successfully", getTraceId(), savedComment.getId());
 
-        return CommentResponse.fromEntity(savedComment);
+            return CommentResponse.fromEntity(savedComment);
+        } catch (Exception e) {
+            log.error("[{}] Error creating comment: {}", getTraceId(), e.getMessage());
+            throw new AppException(ErrorCode.INTERNAL_ERROR, "Failed to create comment");
+        }
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<CommentResponse> getCommentsByPost(Long postId) {
-        log.debug("Fetching comments for post ID: {}", postId);
+        log.info("[{}] Fetching comments for post ID: {}", getTraceId(), postId);
 
         return commentRepository.findActiveCommentsWithUserByPostId(postId)
                 .stream()
@@ -65,27 +74,30 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public CommentResponse updateComment(Long commentId, CommentRequest.UpdateComment request, CustomUserDetails currentUser) {
-        log.debug("Updating comment ID: {} by user ID: {}", commentId, currentUser.getId());
+        log.info("[{}] Updating comment ID: {} by user ID: {}", getTraceId(), commentId, currentUser.getId());
 
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND,
                         "Comment not found with id: " + commentId));
 
         if (!comment.getUser().getId().equals(currentUser.getId())) {
-            log.warn("User ID: {} attempted to update comment ID: {} owned by user ID: {}",
-                    currentUser.getId(), commentId, comment.getUser().getId());
+            log.warn("[{}] User ID: {} attempted to update comment ID: {} owned by user ID: {}",
+                    getTraceId(), currentUser.getId(), commentId, comment.getUser().getId());
             throw new AccessDeniedException("You can only update your own comments");
         }
 
         comment.setContent(request.content());
-        log.info("Comment ID: {} updated successfully", commentId);
 
+        comment.setImageUrl(request.imageUrl());
+        comment.setImagePublicId(request.imagePublicId());
+
+        log.info("[{}] Comment ID: {} updated successfully", getTraceId(), commentId);
         return CommentResponse.fromEntity(comment);
     }
 
     @Override
     public void deleteComment(Long commentId, CustomUserDetails currentUser) {
-        log.debug("Deleting comment ID: {} by user ID: {}", commentId, currentUser.getId());
+        log.info("[{}] Deleting comment ID: {} by user ID: {}", getTraceId(), commentId, currentUser.getId());
 
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND,
@@ -96,12 +108,16 @@ public class CommentServiceImpl implements CommentService {
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
         if (!isAuthor && !isAdmin) {
-            log.warn("User ID: {} (Admin: {}) attempted to delete comment ID: {} owned by user ID: {}",
-                    currentUser.getId(), isAdmin, commentId, comment.getUser().getId());
+            log.warn("[{}] User ID: {} (Admin: {}) attempted to delete comment ID: {} owned by user ID: {}",
+                    getTraceId(), currentUser.getId(), isAdmin, commentId, comment.getUser().getId());
             throw new AccessDeniedException("You can only delete your own comments");
         }
 
         comment.softDelete();
-        log.info("Comment ID: {} soft deleted successfully by user ID: {}", commentId, currentUser.getId());
+        log.info("[{}] Comment ID: {} soft deleted successfully by user ID: {}", getTraceId(), commentId, currentUser.getId());
+    }
+
+    private String getTraceId() {
+        return Objects.toString(MDC.get("traceId"), "SYSTEM");
     }
 }

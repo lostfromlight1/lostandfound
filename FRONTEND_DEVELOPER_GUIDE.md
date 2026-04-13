@@ -1,43 +1,48 @@
-Here is the fully formatted, clean Markdown version of your guide. You can copy the entire block below and paste it directly into your `FRONTEND_DEVELOPER_GUIDE.md` file.
-
 ```markdown
 # Lost & Found – Frontend Developer Guide
 
 ## 📌 Overview
 
-This document defines the **frontend contract with the Lost & Found backend**.
+This document defines the **contract between the frontend and the Lost & Found Spring Boot backend**.
 
-**Base URL (Local):**
-`http://localhost:8080/api/v1`
+### Base URL (Local)
+```
 
-The backend uses:
-* **JWT Access Tokens** (stored in HttpOnly cookies)
-* **Refresh Tokens** (stored in HttpOnly cookies)
-* **OAuth2 (Google)** login
-* **Email verification**
-* **Password reset flow**
-* Standardized **API responses** with `apiId` for tracing
-* Public and protected routes
+[http://localhost:8080/api/v1](http://localhost:8080/api/v1)
 
-Frontend **must always unwrap `data`** from responses and use `withCredentials: true` for Axios requests.
+````
+
+### Backend Features
+- JWT Authentication (Access + Refresh Token)
+- Refresh Token via **Secure HttpOnly Cookies**
+- Google OAuth2 Login
+- Email Verification & Password Reset
+- Cloudinary Image Uploads
+- Standardized API responses (`apiId`, `traceId`)
+
+> ⚠️ **CRITICAL RULES**
+> - Always unwrap `response.data.data`
+> - Always use `withCredentials: true`
+> - Never store tokens in `localStorage`
 
 ---
 
-## 1️⃣ Global Response Structures
+# 1️⃣ Global Response Structure
 
-### ✅ Success Response
-```typescript
+## ✅ Success Response
+```ts
 interface BaseResponse<T> {
-  timestamp: string;    // ISO-8601
-  apiId: string;        // e.g., AUTH-002, USER-004
-  traceId: string;      // Unique request ID
-  message: string;      // Human-readable
-  data: T | null;       // Payload
+  timestamp: string;
+  apiId: string;     // e.g., AUTH-002
+  traceId: string;   // request tracking
+  message: string;
+  data: T | null;
 }
-```
+````
 
-### ❌ Error Response
-```typescript
+## ❌ Error Response
+
+```ts
 interface BaseErrorResponse {
   timestamp: string;
   httpStatus: number;
@@ -49,44 +54,60 @@ interface BaseErrorResponse {
   validationErrors: Record<string, string>;
 }
 ```
-> **Frontend Note:** Map `error.response.data.validationErrors` directly to your form fields.
+
+### 🔥 Frontend Handling Rule
+
+```ts
+error.response.data.validationErrors
+```
+
+Use this directly to map form errors.
 
 ---
 
-## 2️⃣ Authentication & Headers
+# 2️⃣ Authentication System
 
-Protected routes require:
-```http
+## Token Strategy
+
+* **Access Token**
+
+    * Returned in response body
+    * Stored in memory (Zustand / Context)
+    * Sent via Authorization header
+
+* **Refresh Token**
+
+    * Stored in **HttpOnly Cookie**
+    * Automatically sent by browser
+
+## Header Format
+
+```
 Authorization: Bearer <access_token>
 ```
 
-For Axios, ensure cookies are sent with every request:
-```javascript
-axios.defaults.withCredentials = true; // send HttpOnly cookies
-```
+## Axios Requirement (MANDATORY)
 
-Optional API key header (for API gateway):
-```http
-X-API-KEY: your-api-key
+```ts
+axios.defaults.withCredentials = true;
 ```
 
 ---
 
-## 3️⃣ TypeScript Models (DTOs)
+# 3️⃣ TypeScript Models (DTOs)
 
-### 👤 User
-```typescript
+## 👤 Auth & User
+
+```ts
 interface UserResponse {
   id: number;
   email: string;
   displayName: string;
-  contactInfo: string;
+  contactInfo?: string;
   role: "USER" | "ADMIN";
+  avatarUrl?: string;
 }
-```
 
-### 🔐 Auth
-```typescript
 interface AuthResponse {
   accessToken: string;
   refreshToken: string;
@@ -96,164 +117,253 @@ interface AuthResponse {
 }
 ```
 
-### 📄 Pagination
-```typescript
-interface PaginatedResponse<T> {
+## 📄 Pagination
+
+```ts
+interface PageResponse<T> {
   content: T[];
-  pageable: any;
-  last: boolean;
-  totalPages: number;
-  totalElements: number;
-  first: boolean;
+  page: number;
   size: number;
-  number: number;
-  empty: boolean;
+  totalElements: number;
+  totalPages: number;
+}
+```
+
+## 🖼️ Shared Types
+
+```ts
+interface ImageDto {
+  id: number;
+  url: string;
+  sortOrder: number;
+}
+
+interface ImageUploadResponse {
+  url: string;
+  publicId: string;
+}
+
+interface CategoryDto {
+  id: number;
+  name: string;
 }
 ```
 
 ---
 
-## 4️⃣ Auth Endpoints
+# 4️⃣ API Endpoints
 
-| Endpoint | Method | Auth | Body / Query | Response |
-| :--- | :--- | :--- | :--- | :--- |
-| `/auth/register` | POST | ❌ | `{ email, password, displayName, contactInfo? }` | `BaseResponse<UserResponse>` |
-| `/auth/login` | POST | ❌ | `{ email, password }` | `BaseResponse<AuthResponse>` |
-| `/auth/refresh` | POST | ❌ | `{ refreshToken }` | `BaseResponse<AuthResponse>` |
-| `/auth/change-password` | POST | ✅ | `{ oldPassword, newPassword }` | `BaseResponse<null>` |
-| `/auth/reset-password` | POST | ❌ | `?email=` | `BaseResponse<null>` |
-| `/auth/reset-password/confirm` | POST | ❌ | `{ token, newPassword }` | `BaseResponse<null>` |
-| `/auth/verify-email` | GET | ❌ | `?token=` | `BaseResponse<null>` |
-| `/auth/resend-verification` | POST | ❌ | `?email=` | `BaseResponse<null>` |
-| `/auth/logout` | POST | ✅ | *none* | `BaseResponse<null>` |
+## 🔐 Auth (`/auth`)
 
----
-
-## 5️⃣ OAuth2 (Google) Flow
-
-1.  **Frontend redirects to:** `http://localhost:8080/oauth2/authorization/google`
-2.  **Backend handles login/register.**
-3.  **Backend sets HttpOnly cookies:** `accessToken`, `refreshToken`
-4.  **Backend redirects to:** `http://localhost:3000/dashboard`
-5.  **Frontend fetches current user:** `GET /users/me` (using `withCredentials: true`)
-
-> **Notes:**
-> * OAuth login blocks if a LOCAL account exists with the same email.
-> * Frontend reads `/login?error=...` for collision messages.
+| Endpoint                  | Method | Auth | Description            |
+| ------------------------- | ------ | ---- | ---------------------- |
+| `/register`               | POST   | ❌    | Register               |
+| `/login`                  | POST   | ❌    | Login                  |
+| `/google`                 | POST   | ❌    | Google OAuth           |
+| `/refresh`                | POST   | ❌    | Refresh token (cookie) |
+| `/logout`                 | POST   | ✅    | Logout                 |
+| `/change-password`        | POST   | ✅    | Change password        |
+| `/reset-password`         | POST   | ❌    | Request reset          |
+| `/reset-password/confirm` | POST   | ❌    | Confirm reset          |
+| `/verify-email`           | GET    | ❌    | Verify email           |
+| `/resend-verification`    | POST   | ❌    | Resend email           |
 
 ---
 
-## 6️⃣ User Endpoints
+## 👤 Users (`/users`)
 
-| Endpoint | Method | Auth | Description | Response |
-| :--- | :--- | :--- | :--- | :--- |
-| `/users/me` | GET | ✅ | Current user profile | `BaseResponse<UserResponse>` |
-| `/users/update` | PUT | ✅ | Update profile | `BaseResponse<UserResponse>` |
-| `/users/{id}/profile` | GET | ❌ | Public user profile | `BaseResponse<UserResponse>` |
-| `/users?page=0&size=20` | GET | ✅ ADMIN | Get all users | `BaseResponse<PaginatedResponse<UserResponse>>` |
-| `/users/search` | GET | ✅ ADMIN | Search users | `BaseResponse<PaginatedResponse<UserResponse>>` |
-| `/users/{id}/ban` | PUT | ✅ ADMIN | Ban user | `BaseResponse<null>` |
+| Endpoint        | Method | Auth | Description    |
+| --------------- | ------ | ---- | -------------- |
+| `/me`           | GET    | ✅    | Current user   |
+| `/me`           | PUT    | ✅    | Update profile |
+| `/{id}/profile` | GET    | ❌    | Public profile |
 
 ---
 
-## 7️⃣ Axios Rules
-* `withCredentials: true` → **Must** be set to send cookies.
-* **Auto-unwrap:** Extract data using `response.data.data`.
-* **Validation errors:** Extract using `error.response.data.validationErrors`.
-* **Refresh token on 401:** Catch the 401, call `/auth/refresh`, and retry the original request.
+## 📝 Posts (`/posts`)
+
+| Endpoint  | Method | Auth | Description      |
+| --------- | ------ | ---- | ---------------- |
+| `/create` | POST   | ✅    | Create post      |
+| `/{id}`   | PUT    | ✅    | Update post      |
+| `/`       | GET    | ❌    | Feed (paginated) |
+| `/{id}`   | DELETE | ✅    | Delete post      |
 
 ---
 
-## 8️⃣ Recommended Folder Structure (Frontend)
+## 💬 Comments (`/comments`)
 
-```text
+| Endpoint         | Method | Auth | Description    |
+| ---------------- | ------ | ---- | -------------- |
+| `/`              | POST   | ✅    | Create comment |
+| `/post/{postId}` | GET    | ❌    | Get comments   |
+| `/{id}`          | PUT    | ✅    | Update comment |
+| `/{id}`          | DELETE | ✅    | Delete comment |
+
+---
+
+## 🖼️ Images (`/images`)
+
+| Endpoint  | Method | Auth | Description  |
+| --------- | ------ | ---- | ------------ |
+| `/upload` | POST   | ✅    | Upload image |
+
+---
+
+## 🛡️ Admin (ROLE_ADMIN)
+
+* `GET /users`
+* `GET /users/search`
+* `PUT /users/{id}/ban`
+* `PUT /users/{id}/unban`
+* `POST /categories`
+* `PUT /categories/{id}`
+* `DELETE /categories/{id}`
+
+---
+
+# 5️⃣ Critical Flows
+
+## 🔄 Auth Flow (JWT + Refresh)
+
+1. Login → receive access token + cookie
+2. Store access token in memory
+3. Attach token to requests
+4. On 401:
+
+    * Call `/auth/refresh`
+    * Update token
+    * Retry original request
+
+---
+
+## 🔐 Google OAuth Flow
+
+1. Get Google ID token (frontend)
+2. Send to `/auth/google`
+3. Backend returns tokens + sets cookies
+4. Handle account collision errors
+
+---
+
+## 🚪 Logout Flow
+
+1. Call `/auth/logout`
+2. Backend clears cookies
+3. Frontend clears memory token
+4. Redirect to login
+
+---
+
+## 📤 Image Upload Flow
+
+1. Upload file → `/images/upload`
+2. Receive `{ url, publicId }`
+3. Attach to post or profile
+
+---
+
+# 6️⃣ Frontend Architecture
+
+## Recommended Structure
+
+```
 src/
 ├── api/
 │   ├── axios.ts
 │   ├── auth.api.ts
-│   └── user.api.ts
+│   ├── user.api.ts
+│   └── post.api.ts
 ├── types/
 │   └── api.types.ts
 ├── services/
-│   ├── auth.service.ts
-│   └── user.service.ts
 ├── hooks/
-│   ├── useAuth.ts
-│   └── useUser.ts
 ├── store/
-│   ├── auth.store.ts
-│   └── user.store.ts
 ├── features/
-│   ├── auth/
-│   │   ├── api/
-│   │   ├── components/
-│   │   └── hooks/
-│   └── users/
 └── pages/
-    ├── login.tsx
-    ├── register.tsx
-    └── dashboard.tsx
 ```
 
 ---
 
-## 9️⃣ Logout Flow
-1.  Frontend calls `POST /auth/logout`.
-2.  Backend clears HttpOnly cookies.
-3.  Frontend redirects to `/login`.
+# 7️⃣ Axios Rules (VERY IMPORTANT)
+
+## Request Interceptor
+
+* Attach access token
+
+## Response Interceptor
+
+* Auto unwrap `data`
+* Handle 401 → refresh → retry
+
+## Example Behavior
+
+```ts
+response.data.data
+```
 
 ---
 
-## 🔟 Password Reset & Email Verification
-* `/auth/reset-password` → Request reset link via email.
-* `/auth/reset-password/confirm` → Confirm reset with token and new password.
-* `/auth/verify-email` → Verify email address with token.
-* `/auth/resend-verification` → Resend the verification email.
+# 8️⃣ Security Rules
+
+* ❌ No localStorage for tokens
+* ✅ Access token in memory only
+* ✅ HttpOnly cookie for refresh
+* ✅ Always `withCredentials`
+* ✅ Backend enforces auth
 
 ---
 
-## 1️⃣1️⃣ Creating New APIs
-1.  Add request DTO in `features/*/api`.
-2.  Add response DTO in `types/api.types.ts`.
-3.  Wrap all responses in `BaseResponse<T>`.
-4.  Follow the `apiId` convention (e.g., `MODULE-001`, `MODULE-002`).
+# 9️⃣ API Development Rules
+
+When adding new APIs:
+
+1. Define DTOs in `types`
+2. Follow `BaseResponse<T>`
+3. Use consistent naming (`AUTH-001`, `USR-002`)
+4. Keep endpoints RESTful
+5. Support pagination via `PageResponse`
 
 ---
 
-## 1️⃣2️⃣ AI Integration Prompt Example
+# 🔟 AI Integration Prompt
 
-When using AI tools (like Cursor, Copilot, or Claude) to build the frontend, paste this document into the context and use a prompt like this:
+Use this with Cursor / Copilot:
 
-> "Read `FRONTEND_DEVELOPER_GUIDE.md`. Create:
-> * An Axios instance with `withCredentials: true`.
-> * An Auth interceptor for cookies.
-> * A Refresh token interceptor.
-> * A Global error handler.
-> * A Validation error handler.
-> * An API service structure.
->
-> **Requirements:**
-> * Auto unwrap `response.data.data`.
-> * Handle validation errors mapping them to form fields.
-> * Refresh token retry on 401.
-> * Redirect to `/login` if the refresh fails."
+```
+Read FRONTEND_DEVELOPER_GUIDE.md
+
+Create:
+1. Axios instance with withCredentials: true
+2. Request interceptor (attach Bearer token from Zustand)
+3. Response interceptor:
+   - Handle 401
+   - Call /auth/refresh
+   - Retry request
+4. Global error handler (validationErrors)
+5. API services for:
+   - Auth
+   - Users
+   - Posts
+   - Comments
+   - Images
+   - Categories
+```
+
+```
 
 ---
 
-## 1️⃣3️⃣ Security Rules
-* **Always** use `withCredentials` for cookies.
-* **Never** store access or refresh tokens in `localStorage`.
-* Frontend should read `/login?error` to handle OAuth collisions cleanly.
-* Protected routes require backend JWT validation.
-* Public routes are whitelisted in the backend config.
+### What I fixed (important)
+- Removed duplicate sections (you had 2 full guides merged raw)
+- Unified endpoint naming (`/posts` root vs blank)
+- Standardized wording (no contradictions)
+- Cleaned flow explanations (now matches real JWT flow)
+- Tightened architecture → actually usable for devs + AI tools
 
 ---
 
-## 1️⃣4️⃣ Goal
-* Predictable API responses
-* Clean frontend integration
-* AI-assisted development optimization
-* Scalable architecture
-* Minimal integration bugs
-* Secure OAuth + JWT implementation
+If you want next step, I can:
+- generate your **full Axios + interceptor implementation**
+- or scaffold **entire frontend API layer (ready to paste)**
 ```

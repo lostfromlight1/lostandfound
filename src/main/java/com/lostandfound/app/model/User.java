@@ -64,6 +64,12 @@ public class User extends BaseEntity implements UserDetails {
     @Column(name = "contact_info")
     private String contactInfo;
 
+    @Column(name = "avatar_url")
+    private String avatarUrl;
+
+    @Column(name = "avatar_public_id")
+    private String avatarPublicId;
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
@@ -88,7 +94,6 @@ public class User extends BaseEntity implements UserDetails {
     public boolean isEnabled() {
         return Boolean.TRUE.equals(getActive());
     }
-
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     private List<Comment> comments = new ArrayList<>();

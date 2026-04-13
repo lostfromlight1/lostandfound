@@ -41,6 +41,9 @@ public class UserServiceImpl extends BaseService implements UserService {
         user.setDisplayName(request.displayName());
         user.setContactInfo(request.contactInfo());
 
+        user.setAvatarUrl(request.avatarUrl());
+        user.setAvatarPublicId(request.avatarPublicId());
+
         User updated = userRepository.save(user);
         log.info("[{}] Profile updated successfully for user ID: {}", getTraceId(), updated.getId());
 
@@ -87,6 +90,24 @@ public class UserServiceImpl extends BaseService implements UserService {
         log.warn("[{}] User ID: {} has been locked/banned and all refresh tokens revoked", getTraceId(), userId);
     }
 
+    @Override
+    @Transactional
+    public void unbanUser(Long userId) {
+        log.info("[{}] Attempting to unban user ID: {}", getTraceId(), userId);
+
+        User user = fetchUserById(userId);
+
+        if (Boolean.FALSE.equals(user.getIsLocked())) {
+            log.info("[{}] User ID: {} is already active and unbanned", getTraceId(), userId);
+            return;
+        }
+
+        user.setIsLocked(false);
+        userRepository.save(user);
+
+        log.info("[{}] User ID: {} has been unlocked/unbanned successfully", getTraceId(), userId);
+    }
+
     // ------------------ Helpers ------------------
 
     private void validateCurrentUser(User currentUser) {
@@ -110,6 +131,7 @@ public class UserServiceImpl extends BaseService implements UserService {
                 .displayName(user.getDisplayName())
                 .contactInfo(user.getContactInfo())
                 .role(user.getRole())
+                .avatarUrl(user.getAvatarUrl())
                 .build();
     }
 }

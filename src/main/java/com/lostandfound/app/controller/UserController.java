@@ -106,4 +106,16 @@ public class UserController {
         userService.banUser(id);
         return BaseResponse.success("User has been banned successfully");
     }
+
+    @PutMapping("/{id}/unban")
+    @CheckSecurity.Admin.isRequired
+    @ApiId("USR-007")
+    @Operation(summary = "Unban User (Admin)", description = "Unlocks a previously banned user account, allowing them to log in again.")
+    public ResponseEntity<BaseResponse<Void>> unbanUser(
+            @PathVariable Long id) {
+
+        log.info("REST request to unban user ID: {}", id);
+        userService.unbanUser(id);
+        return BaseResponse.success("User has been unbanned successfully");
+    }
 }
