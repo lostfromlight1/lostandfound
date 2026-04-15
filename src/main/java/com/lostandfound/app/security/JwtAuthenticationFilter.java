@@ -1,9 +1,5 @@
-// src/main/java/com/lostandfound/app/security/JwtAuthenticationFilter.java
-
 package com.lostandfound.app.security;
 
-import com.lostandfound.app.model.User;
-import com.lostandfound.app.repository.UserRepository;
 import com.lostandfound.app.service.CustomUserDetailsService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -31,7 +27,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final CustomUserDetailsService userDetailsService;
-    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(
@@ -59,18 +54,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 request.setAttribute("exception", "invalid_token_type");
             }
             else if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                // 1. Load UserDetails for JWT validation
+                // 1. Load UserDetails (CustomUserDetails) for JWT validation
                 UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
 
                 if (jwtService.isTokenValid(jwt, userDetails)) {
-                    // 2. CRITICAL FIX: Fetch the actual User entity from the DB
-                    User actualUserEntity = userRepository.findByEmail(userEmail).orElse(null);
-
-                    if (actualUserEntity != null) {
-                        // 3. Pass the actual entity as the Principal so @CurrentUser works!
-                        setAuthentication(request, actualUserEntity, userDetails);
-                        log.debug("[{}] User '{}' authenticated for {}", jwtService.getTraceId(), userDetails.getUsername(), request.getRequestURI());
-                    }
+                    // 2. Set authentication using the UserDetails object directly
+                    setAuthentication(request, userDetails);
+                    log.debug("[{}] User '{}' authenticated for {}", jwtService.getTraceId(), userDetails.getUsername(), request.getRequestURI());
                 }
             }
         } catch (ExpiredJwtException e) {
@@ -104,8 +94,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .orElse(null);
     }
 
-    private void setAuthentication(HttpServletRequest request, User actualUserEntity, UserDetails userDetails) {
-        var authToken = new UsernamePasswordAuthenticationToken(actualUserEntity, null, userDetails.getAuthorities());
+    private void setAuthentication(HttpServletRequest request, UserDetails userDetails) {
+        var authToken = new UsernamePasswordAuthenticationToken(
+                userDetails,
+                null,
+                userDetails.getAuthorities()
+        );
+
         authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         SecurityContextHolder.getContext().setAuthentication(authToken);
     }

@@ -2,7 +2,6 @@ package com.lostandfound.app.controller;
 
 import com.lostandfound.app.annotation.ApiId;
 import com.lostandfound.app.annotation.CheckSecurity;
-import com.lostandfound.app.annotation.CurrentUser;
 import com.lostandfound.app.dto.request.PostRequest;
 import com.lostandfound.app.dto.response.BaseResponse;
 import com.lostandfound.app.dto.response.PageResponse;
@@ -18,6 +17,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal; // Added
 import org.springframework.web.bind.annotation.*;
 
 @Slf4j
@@ -30,11 +30,11 @@ public class PostController {
     private final PostService postService;
 
     @PostMapping("/create")
+    @CheckSecurity.Authenticated.isRequired
     @ApiId("PST-001")
-    @Operation(summary = "Create Post", description = "Creates a new Lost or Found post.")
     public ResponseEntity<BaseResponse<PostResponse.PostDto>> createPost(
             @Valid @RequestBody PostRequest.CreatePostRequest request,
-            @Parameter(hidden = true) @CurrentUser CustomUserDetails userDetails) {
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails) {
 
         log.info("REST request to create post by user ID: {}", userDetails.getId());
         PostResponse.PostDto response = postService.createPost(request, userDetails);
@@ -48,7 +48,7 @@ public class PostController {
     public ResponseEntity<BaseResponse<PostResponse.PostDto>> updatePost(
             @PathVariable Long id,
             @Valid @RequestBody PostRequest.UpdatePostRequest request,
-            @Parameter(hidden = true) @CurrentUser CustomUserDetails userDetails) {
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails) { // Fixed: Use @AuthenticationPrincipal
 
         log.info("REST request to update post ID: {} by user ID: {}", id, userDetails.getId());
         PostResponse.PostDto response = postService.updatePost(id, request, userDetails);
@@ -72,12 +72,12 @@ public class PostController {
     }
 
     @DeleteMapping("/{id}")
-    @CheckSecurity.Posts.canManage // FIXED: Added custom security check!
+    @CheckSecurity.Posts.canManage
     @ApiId("PST-004")
     @Operation(summary = "Delete Post", description = "Soft deletes a post. Only the post owner can perform this action.")
     public ResponseEntity<BaseResponse<Void>> deletePost(
             @PathVariable Long id,
-            @Parameter(hidden = true) @CurrentUser CustomUserDetails userDetails) {
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails) { // Fixed: Use @AuthenticationPrincipal
 
         log.info("REST request to delete post ID: {} by user ID: {}", id, userDetails.getId());
         postService.deletePost(id, userDetails);

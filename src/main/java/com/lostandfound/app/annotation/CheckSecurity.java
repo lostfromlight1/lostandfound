@@ -15,6 +15,13 @@ public @interface CheckSecurity {
     public @interface canRead {}
   }
 
+  public @interface Authenticated {
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    @PreAuthorize("isAuthenticated()")
+    public @interface isRequired {}
+  }
+
   public @interface Admin {
     @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.METHOD)
