@@ -1,13 +1,13 @@
 package com.lostandfound.app.controller;
 
 import com.lostandfound.app.annotation.ApiId;
-import com.lostandfound.app.dto.request.AuthRequest.UpdateProfileRequest;
-import com.lostandfound.app.dto.response.BaseResponse;
-import com.lostandfound.app.dto.response.PageResponse; // Make sure to import your custom PageResponse!
-import com.lostandfound.app.dto.response.UserResponse;
-import com.lostandfound.app.model.User;
 import com.lostandfound.app.annotation.CheckSecurity;
 import com.lostandfound.app.annotation.CurrentUser;
+import com.lostandfound.app.dto.request.AuthRequest.UpdateProfileRequest;
+import com.lostandfound.app.dto.response.BaseResponse;
+import com.lostandfound.app.dto.response.PageResponse;
+import com.lostandfound.app.dto.response.UserResponse;
+import com.lostandfound.app.security.CustomUserDetails; // Import updated
 import com.lostandfound.app.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -39,7 +39,7 @@ public class UserController {
     @ApiId("USR-001")
     @Operation(summary = "Get My Profile", description = "Fetches the profile of the currently authenticated user.")
     public ResponseEntity<BaseResponse<UserResponse>> getMe(
-            @Parameter(hidden = true) @CurrentUser User currentUser) {
+            @Parameter(hidden = true) @CurrentUser CustomUserDetails currentUser) { // FIXED TYPE
         log.info("REST request to get profile for current user ID: {}", currentUser.getId());
         UserResponse response = userService.getMe(currentUser);
         return BaseResponse.success("Profile fetched successfully", response);
@@ -49,7 +49,7 @@ public class UserController {
     @ApiId("USR-002")
     @Operation(summary = "Update My Profile", description = "Updates the display name and contact info of the current user.")
     public ResponseEntity<BaseResponse<UserResponse>> updateProfile(
-            @Parameter(hidden = true) @CurrentUser User currentUser,
+            @Parameter(hidden = true) @CurrentUser CustomUserDetails currentUser, // FIXED TYPE
             @Valid @RequestBody UpdateProfileRequest request) {
         log.info("REST request to update profile for user ID: {}", currentUser.getId());
         UserResponse response = userService.updateProfile(currentUser, request);
@@ -60,7 +60,7 @@ public class UserController {
     @ApiId("USR-008")
     @Operation(summary = "Upload Profile Picture")
     public ResponseEntity<BaseResponse<UserResponse>> uploadAvatar(
-            @Parameter(hidden = true) @CurrentUser User currentUser,
+            @Parameter(hidden = true) @CurrentUser CustomUserDetails currentUser, // FIXED TYPE
             @RequestPart("file") MultipartFile file) {
 
         log.info("REST request to upload avatar for user ID: {}", currentUser.getId());

@@ -9,7 +9,7 @@ import com.lostandfound.app.dto.response.BaseResponse;
 import com.lostandfound.app.dto.response.UserResponse;
 import com.lostandfound.app.exception.AppException;
 import com.lostandfound.app.exception.ErrorCode;
-import com.lostandfound.app.model.User;
+import com.lostandfound.app.security.CustomUserDetails;
 import com.lostandfound.app.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -82,7 +82,7 @@ public class AuthController {
     @ApiId("AUTH-004")
     @Operation(summary = "Change Password")
     public ResponseEntity<BaseResponse<Void>> changePassword(
-            @Parameter(hidden = true) @CurrentUser User currentUser,
+            @Parameter(hidden = true) @CurrentUser CustomUserDetails currentUser,
             @Valid @RequestBody ChangePasswordRequest request) {
         log.info("REST request to change password for user ID: {}", currentUser != null ? currentUser.getId() : "UNKNOWN");
         authService.changePassword(currentUser, request);
@@ -129,7 +129,7 @@ public class AuthController {
     @ApiId("AUTH-009")
     @Operation(summary = "User Logout", description = "Revokes the refresh token provided in the JSON body.")
     public ResponseEntity<BaseResponse<Void>> logout(
-            @Parameter(hidden = true) @CurrentUser User currentUser,
+            @Parameter(hidden = true) @CurrentUser CustomUserDetails currentUser,
             @RequestBody(required = false) Map<String, String> requestBody) {
 
         log.info("REST request to logout user ID: {}", currentUser != null ? currentUser.getId() : "UNKNOWN");

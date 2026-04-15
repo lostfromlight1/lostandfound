@@ -13,6 +13,7 @@ import com.lostandfound.app.model.*;
 import com.lostandfound.app.repository.PasswordResetTokenRepository;
 import com.lostandfound.app.repository.UserRepository;
 import com.lostandfound.app.repository.VerificationTokenRepository;
+import com.lostandfound.app.security.CustomUserDetails;
 import com.lostandfound.app.security.JwtService;
 import com.lostandfound.app.service.AuthService;
 import com.lostandfound.app.service.BaseService;
@@ -240,7 +241,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
 
     @Override
     @Transactional
-    public void changePassword(User currentUser, ChangePasswordRequest request) {
+    public void changePassword(CustomUserDetails currentUser, ChangePasswordRequest request) {
         if (currentUser == null) {
             throw new AppException(ErrorCode.UNAUTHORIZED, "Access Denied: Missing or invalid authentication token.");
         }
@@ -364,7 +365,7 @@ public class AuthServiceImpl extends BaseService implements AuthService {
                 .displayName(user.getDisplayName())
                 .contactInfo(user.getContactInfo())
                 .role(user.getRole())
-                .avatarUrl(user.getAvatarUrl()) // <-- NEW!
+                .avatarUrl(user.getAvatarUrl())
                 .build();
     }
 }
