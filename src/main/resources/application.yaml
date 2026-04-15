@@ -159,6 +159,6 @@ logging:
 
 # --- Cloudinary Configuration ---
 cloudinary:
-  cloud-name: ${CLOUDINARY_CLOUD_NAME:your_cloud_name_here}
-  api-key: ${CLOUDINARY_API_KEY:your_api_key_here}
-  api-secret: ${CLOUDINARY_API_SECRET:your_api_secret_here}
+  cloud-name: dclm3ftox
+  api-key: "693735816494547"
+  api-secret: zPx7TKi_1tIxtzA815CwF_uAZgg

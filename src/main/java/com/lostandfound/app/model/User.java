@@ -96,5 +96,6 @@ public class User extends BaseEntity implements UserDetails {
     }
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @Builder.Default
     private List<Comment> comments = new ArrayList<>();
 }

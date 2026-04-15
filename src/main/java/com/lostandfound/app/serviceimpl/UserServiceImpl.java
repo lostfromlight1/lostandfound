@@ -1,6 +1,7 @@
 package com.lostandfound.app.serviceimpl;
 
 import com.lostandfound.app.dto.request.AuthRequest.UpdateProfileRequest;
+import com.lostandfound.app.dto.response.PageResponse;
 import com.lostandfound.app.dto.response.UserResponse;
 import com.lostandfound.app.exception.AppException;
 import com.lostandfound.app.exception.ErrorCode;
@@ -15,6 +16,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.lostandfound.app.service.ImageService;
+import com.lostandfound.app.dto.response.ImageUploadResponse;
+import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @Service
@@ -23,6 +27,7 @@ public class UserServiceImpl extends BaseService implements UserService {
 
     private final UserRepository userRepository;
     private final RefreshTokenService refreshTokenService;
+    private final ImageService imageService;
 
     @Override
     public UserResponse getMe(User currentUser) {
@@ -51,23 +56,63 @@ public class UserServiceImpl extends BaseService implements UserService {
     }
 
     @Override
+    @Transactional
+    public UserResponse uploadProfilePicture(User currentUser, MultipartFile file) {
+        validateCurrentUser(currentUser);
+        log.info("[{}] Uploading new profile picture for user ID: {}", getTraceId(), currentUser.getId());
+
+        User user = fetchUserById(currentUser.getId());
+
+        if (user.getAvatarPublicId() != null && !user.getAvatarPublicId().isEmpty()) {
+            imageService.deleteImage(user.getAvatarPublicId());
+        }
+
+        ImageUploadResponse uploadedImage = imageService.uploadImage(file, "avatars");
+
+        user.setAvatarUrl(uploadedImage.getUrl());
+        user.setAvatarPublicId(uploadedImage.getPublicId());
+
+        User updatedUser = userRepository.save(user);
+
+        return mapToResponse(updatedUser);
+    }
+
+    @Override
     public UserResponse getPublicProfile(Long userId) {
         log.info("[{}] Fetching public profile for user ID: {}", getTraceId(), userId);
         return mapToResponse(fetchUserById(userId));
     }
 
     @Override
-    public Page<UserResponse> getAllUsers(Pageable pageable) {
+    public PageResponse<UserResponse> getAllUsers(Pageable pageable) {
         log.info("[{}] Fetching all users, page={}", getTraceId(), pageable.getPageNumber());
-        return userRepository.findAll(pageable).map(this::mapToResponse);
+        Page<UserResponse> page = userRepository.findAll(pageable).map(this::mapToResponse);
+
+        return new PageResponse<>(
+                page.getContent(),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages()
+        );
     }
 
+    // ⚠️ FIXED: Returning PageResponse mapping
     @Override
-    public Page<UserResponse> searchUsers(String query, Pageable pageable) {
+    public PageResponse<UserResponse> searchUsers(String query, Pageable pageable) {
         log.info("[{}] Searching users with query='{}', page={}", getTraceId(), query, pageable.getPageNumber());
         Page<User> users = userRepository.searchUsers(query, pageable);
         log.info("[{}] Search returned {} total users", getTraceId(), users.getTotalElements());
-        return users.map(this::mapToResponse);
+
+        Page<UserResponse> page = users.map(this::mapToResponse);
+
+        return new PageResponse<>(
+                page.getContent(),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages()
+        );
     }
 
     @Override
@@ -132,6 +177,7 @@ public class UserServiceImpl extends BaseService implements UserService {
                 .contactInfo(user.getContactInfo())
                 .role(user.getRole())
                 .avatarUrl(user.getAvatarUrl())
+                .isLocked(user.getIsLocked())
                 .build();
     }
 }

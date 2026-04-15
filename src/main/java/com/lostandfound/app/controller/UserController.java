@@ -3,6 +3,7 @@ package com.lostandfound.app.controller;
 import com.lostandfound.app.annotation.ApiId;
 import com.lostandfound.app.dto.request.AuthRequest.UpdateProfileRequest;
 import com.lostandfound.app.dto.response.BaseResponse;
+import com.lostandfound.app.dto.response.PageResponse; // Make sure to import your custom PageResponse!
 import com.lostandfound.app.dto.response.UserResponse;
 import com.lostandfound.app.model.User;
 import com.lostandfound.app.annotation.CheckSecurity;
@@ -14,11 +15,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
 @RestController
@@ -43,7 +45,7 @@ public class UserController {
         return BaseResponse.success("Profile fetched successfully", response);
     }
 
-    @PutMapping("/update")
+    @PutMapping("/me")
     @ApiId("USR-002")
     @Operation(summary = "Update My Profile", description = "Updates the display name and contact info of the current user.")
     public ResponseEntity<BaseResponse<UserResponse>> updateProfile(
@@ -52,6 +54,18 @@ public class UserController {
         log.info("REST request to update profile for user ID: {}", currentUser.getId());
         UserResponse response = userService.updateProfile(currentUser, request);
         return BaseResponse.success("Profile updated successfully", response);
+    }
+
+    @PostMapping(value = "/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ApiId("USR-008")
+    @Operation(summary = "Upload Profile Picture")
+    public ResponseEntity<BaseResponse<UserResponse>> uploadAvatar(
+            @Parameter(hidden = true) @CurrentUser User currentUser,
+            @RequestPart("file") MultipartFile file) {
+
+        log.info("REST request to upload avatar for user ID: {}", currentUser.getId());
+        UserResponse response = userService.uploadProfilePicture(currentUser, file);
+        return BaseResponse.success("Profile picture updated successfully", response);
     }
 
     // -------------------------------------------------------------------------
@@ -77,10 +91,10 @@ public class UserController {
     @CheckSecurity.Admin.isRequired
     @ApiId("USR-004")
     @Operation(summary = "Get All Users (Admin)", description = "Returns a paginated list of all registered users.")
-    public ResponseEntity<BaseResponse<Page<UserResponse>>> getAllUsers(
+    public ResponseEntity<BaseResponse<PageResponse<UserResponse>>> getAllUsers(
             @PageableDefault(size = 20) Pageable pageable) {
         log.info("REST request to get all users. Page: {}", pageable.getPageNumber());
-        Page<UserResponse> response = userService.getAllUsers(pageable);
+        PageResponse<UserResponse> response = userService.getAllUsers(pageable);
         return BaseResponse.success("Users fetched successfully", response);
     }
 
@@ -88,11 +102,11 @@ public class UserController {
     @CheckSecurity.Admin.isRequired
     @ApiId("USR-005")
     @Operation(summary = "Search Users (Admin)", description = "Searches users by email or display name.")
-    public ResponseEntity<BaseResponse<Page<UserResponse>>> searchUsers(
+    public ResponseEntity<BaseResponse<PageResponse<UserResponse>>> searchUsers(
             @RequestParam String query,
             @PageableDefault(size = 20) Pageable pageable) {
         log.info("REST request to search users with query: '{}'", query);
-        Page<UserResponse> response = userService.searchUsers(query, pageable);
+        PageResponse<UserResponse> response = userService.searchUsers(query, pageable);
         return BaseResponse.success("User search completed", response);
     }
 
@@ -113,7 +127,6 @@ public class UserController {
     @Operation(summary = "Unban User (Admin)", description = "Unlocks a previously banned user account, allowing them to log in again.")
     public ResponseEntity<BaseResponse<Void>> unbanUser(
             @PathVariable Long id) {
-
         log.info("REST request to unban user ID: {}", id);
         userService.unbanUser(id);
         return BaseResponse.success("User has been unbanned successfully");

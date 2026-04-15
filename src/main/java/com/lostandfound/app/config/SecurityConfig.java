@@ -1,6 +1,7 @@
 package com.lostandfound.app.config;
 
 import com.lostandfound.app.exception.RestAccessDeniedHandler;
+import com.lostandfound.app.exception.RestAuthenticationEntryPoint;
 import com.lostandfound.app.security.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +32,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final TraceIdFilter traceIdFilter;
     private final ApiKeyFilter apiKeyFilter;
-//    private final CustomAuthenticationEntryPoint authEntryPoint;
+    private final RestAuthenticationEntryPoint authEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
     private final SecurityProperties securityProperties;
 
@@ -55,7 +56,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> {
-//                    ex.authenticationEntryPoint(authEntryPoint);
+                    ex.authenticationEntryPoint(authEntryPoint);
                     ex.accessDeniedHandler(accessDeniedHandler);
                 })
                 .authorizeHttpRequests(auth -> auth

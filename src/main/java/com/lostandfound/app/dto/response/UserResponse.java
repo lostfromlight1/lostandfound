@@ -10,5 +10,6 @@ public record UserResponse(
         String displayName,
         String contactInfo,
         Role role,
-        String avatarUrl
+        String avatarUrl,
+        Boolean isLocked
 ) {}
