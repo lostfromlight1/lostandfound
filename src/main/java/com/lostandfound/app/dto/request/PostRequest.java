@@ -1,5 +1,6 @@
 package com.lostandfound.app.dto.request;
 
+import com.lostandfound.app.model.MyanmarCity;
 import com.lostandfound.app.model.PostStatus;
 import com.lostandfound.app.model.PostType;
 import jakarta.validation.constraints.*;
@@ -37,8 +38,14 @@ public class PostRequest {
                 @NotNull(message = "Category is required")
                 Long categoryId,
 
-                @NotBlank(message = "Location is required")
-                String location,
+                @NotNull(message = "City is required")
+                 MyanmarCity city,
+
+                @NotBlank(message = "Location detail are require")
+                @Size(max = 255, message = "Location details are too long")
+                String locationDetails,
+
+
 
                 @NotNull(message = "Date is required")
                 LocalDate lostFoundDate,
@@ -69,8 +76,12 @@ public class PostRequest {
                 @NotNull(message = "Category is required")
                 Long categoryId,
 
-                @NotBlank(message = "Location is required")
-                String location,
+                @NotNull(message = "City is required")
+                MyanmarCity city,
+
+                @NotBlank(message = "Location detail are require")
+                @Size(max = 255, message = "Location details are too long")
+                String locationDetails,
 
                 @NotNull(message = "Date is required")
                 LocalDate lostFoundDate,

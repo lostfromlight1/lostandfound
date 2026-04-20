@@ -1,5 +1,6 @@
 package com.lostandfound.app.dto.response;
 
+import com.lostandfound.app.model.MyanmarCity;
 import com.lostandfound.app.model.PostStatus;
 import com.lostandfound.app.model.PostType;
 
@@ -14,7 +15,8 @@ public class PostResponse {
             String description,
             PostType type,
             PostStatus status,
-            String location,
+            MyanmarCity city,
+            String locationDetails,
             LocalDate lostFoundDate,
             String contactInfo,
             java.math.BigDecimal reward,

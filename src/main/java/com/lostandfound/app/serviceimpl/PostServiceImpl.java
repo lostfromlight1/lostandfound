@@ -60,7 +60,8 @@ public class PostServiceImpl implements PostService {
             post.setTitle(request.title());
             post.setDescription(request.description());
             post.setPostType(request.type());
-            post.setLocation(MyanmarCity.valueOf(request.location().toUpperCase()));
+            post.setCity(request.city());
+            post.setLocationDetails(request.locationDetails());
             post.setLostFoundDate(request.lostFoundDate());
             post.setContactInfo(request.contactInfo());
             post.setReward(request.reward());
@@ -113,7 +114,8 @@ public class PostServiceImpl implements PostService {
             post.setDescription(request.description());
             post.setPostType(request.type());
             post.setStatus(request.status());
-            post.setLocation(MyanmarCity.valueOf(request.location().toUpperCase()));
+            post.setCity(request.city());
+            post.setLocationDetails(request.locationDetails());
             post.setContactInfo(request.contactInfo());
             post.setLostFoundDate(request.lostFoundDate());
             post.setCategory(category);
@@ -228,7 +230,8 @@ public class PostServiceImpl implements PostService {
                 post.getDescription(),
                 post.getPostType(),
                 post.getStatus(),
-                post.getLocation() != null ? post.getLocation().name() : null,
+                post.getCity(),
+                post.getLocationDetails(),
                 post.getLostFoundDate(),
                 post.getContactInfo(),
                 post.getReward(),

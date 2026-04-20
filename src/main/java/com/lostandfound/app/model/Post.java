@@ -37,7 +37,11 @@ public class Post extends BaseEntity {
     private PostStatus status;
 
     @Enumerated(EnumType.STRING)
-    private MyanmarCity location;
+    private MyanmarCity city;
+
+
+    private String locationDetails;
+
 
     private LocalDate lostFoundDate;
 
