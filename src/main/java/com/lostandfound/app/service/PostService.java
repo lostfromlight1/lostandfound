@@ -19,7 +19,8 @@ PostResponse.PostDto updatePost(Long id, PostRequest.UpdatePostRequest request,C
             int size,
             PostType type,
             Long categoryId,
-            MyanmarCity location
+            MyanmarCity city,
+            String locationDetails
     );
 
     public void deletePost(Long id,CustomUserDetails userDetails);
