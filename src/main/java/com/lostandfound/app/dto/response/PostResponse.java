@@ -28,7 +28,8 @@ public class PostResponse {
     public record UserSummary(
             Long id,
             String displayName,
-            String avatarUrl
+            String avatarUrl,
+            String email
     ) {}
 
     public record CategoryDto(

@@ -235,7 +235,8 @@ public class PostServiceImpl implements PostService {
                 new PostResponse.UserSummary(
                         post.getUser().getId(),
                         post.getUser().getDisplayName(),
-                        post.getUser().getAvatarUrl()
+                        post.getUser().getAvatarUrl(),
+                        post.getUser().getEmail()
                 ),
                 new PostResponse.CategoryDto(
                         post.getCategory().getId(),
