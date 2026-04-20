@@ -161,7 +161,8 @@ public class PostServiceImpl implements PostService {
             int size,
             PostType type,
             Long categoryId,
-            MyanmarCity location
+            MyanmarCity city,
+            String locationDetails
     ) {
         log.info("[{}] Fetching posts. Page: {}, Size: {}", getTraceId(), page, size);
 
@@ -170,7 +171,8 @@ public class PostServiceImpl implements PostService {
         Specification<Post> spec = Specification.allOf(
                 PostSpecification.hasType(type),
                 PostSpecification.hasCategory(categoryId),
-                PostSpecification.hasLocation(location)
+                PostSpecification.hasCity(city),
+                PostSpecification.hasLocationDetails(locationDetails)
         );
 
         Page<Post> postPage = postRepository.findAll(spec, pageable);

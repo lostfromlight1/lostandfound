@@ -64,10 +64,12 @@ public class PostController {
             @RequestParam(defaultValue = "5") int size,
             @RequestParam(required = false) PostType type,
             @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) MyanmarCity location) {
+            @RequestParam(required = false) MyanmarCity city,
+            @RequestParam(required = false) String locationDetails
+            ) {
 
         log.info("REST request to fetch posts list. Page: {}, Size: {}", page, size);
-        PageResponse<PostResponse.PostDto> response = postService.getAll(page, size, type, categoryId, location);
+        PageResponse<PostResponse.PostDto> response = postService.getAll(page, size, type, categoryId, city,locationDetails);
         return BaseResponse.success("Posts fetched successfully", response);
     }
 
