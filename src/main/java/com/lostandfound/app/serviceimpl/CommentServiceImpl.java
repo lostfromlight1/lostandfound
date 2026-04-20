@@ -2,22 +2,25 @@ package com.lostandfound.app.serviceimpl;
 
 import com.lostandfound.app.dto.request.CommentRequest;
 import com.lostandfound.app.dto.response.CommentResponse;
+import com.lostandfound.app.dto.response.ReplyResponse;
 import com.lostandfound.app.exception.AppException;
 import com.lostandfound.app.exception.ErrorCode;
 import com.lostandfound.app.model.Comment;
 import com.lostandfound.app.model.Post;
+import com.lostandfound.app.model.Reply;
 import com.lostandfound.app.model.User;
 import com.lostandfound.app.repository.CommentRepository;
 import com.lostandfound.app.repository.PostRepository;
+import com.lostandfound.app.repository.ReplyRepository;
 import com.lostandfound.app.repository.UserRepository;
 import com.lostandfound.app.security.CustomUserDetails;
 import com.lostandfound.app.service.CommentService;
-import org.slf4j.MDC;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Objects;
@@ -31,6 +34,7 @@ public class CommentServiceImpl implements CommentService {
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
+    private final ReplyRepository replyRepository;
 
     @Override
     public CommentResponse createComment(CommentRequest.CreateComment request, CustomUserDetails currentUser) {
@@ -68,7 +72,21 @@ public class CommentServiceImpl implements CommentService {
 
         return commentRepository.findActiveCommentsWithUserByPostId(postId)
                 .stream()
-                .map(CommentResponse::fromEntity)
+                .map(comment -> {
+                    // Fetch replies for each comment
+                    List<Reply> rootReplies = replyRepository.findActiveRootRepliesByCommentId(comment.getId());
+                    List<ReplyResponse> replyResponses = rootReplies.stream()
+                            .map(reply -> {
+                                List<Reply> nestedReplies = replyRepository.findActiveNestedRepliesByReplyId(reply.getId());
+                                List<ReplyResponse> nestedResponses = nestedReplies.stream()
+                                        .map(ReplyResponse::fromEntity)
+                                        .toList();
+                                return ReplyResponse.fromEntityWithNestedReplies(reply, nestedResponses);
+                            })
+                            .toList();
+
+                    return CommentResponse.fromEntityWithReplies(comment, replyResponses);
+                })
                 .toList();
     }
 
@@ -87,7 +105,6 @@ public class CommentServiceImpl implements CommentService {
         }
 
         comment.setContent(request.content());
-
         comment.setImageUrl(request.imageUrl());
         comment.setImagePublicId(request.imagePublicId());
 
