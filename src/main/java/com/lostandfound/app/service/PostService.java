@@ -23,6 +23,7 @@ PostResponse.PostDto updatePost(Long id, PostRequest.UpdatePostRequest request,C
             String locationDetails
     );
 
+    PageResponse<PostResponse.PostDto> getUserPosts(Long userId, int page, int size);
     public void deletePost(Long id,CustomUserDetails userDetails);
 
 }

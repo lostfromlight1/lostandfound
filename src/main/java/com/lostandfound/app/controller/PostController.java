@@ -85,4 +85,17 @@ public class PostController {
         postService.deletePost(id, userDetails);
         return BaseResponse.success("Post deleted successfully");
     }
+
+    @GetMapping("/user/{userId}")
+    @ApiId("PST-005")
+    @Operation(summary = "Get User's Posts", description = "Fetches a paginated list of posts created by a specific user.")
+    public ResponseEntity<BaseResponse<PageResponse<PostResponse.PostDto>>> getUserPosts(
+            @PathVariable Long userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size) {
+
+        log.info("REST request to fetch posts for user ID: {}. Page: {}, Size: {}", userId, page, size);
+        PageResponse<PostResponse.PostDto> response = postService.getUserPosts(userId, page, size);
+        return BaseResponse.success("User's posts fetched successfully", response);
+    }
 }

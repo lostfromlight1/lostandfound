@@ -191,6 +191,38 @@ public class PostServiceImpl implements PostService {
         );
     }
 
+    @Transactional(readOnly = true)
+    @Override
+    public PageResponse<PostResponse.PostDto> getUserPosts(Long userId, int page, int size) {
+        log.info("[{}] Fetching posts for user ID: {}. Page: {}, Size: {}", getTraceId(), userId, page, size);
+
+
+        boolean userExists = userRepository.existsById(userId);
+        if (!userExists) {
+            log.error("[{}] User not found with ID: {}", getTraceId(), userId);
+            throw new AppException(ErrorCode.RESOURCE_NOT_FOUND, "User not found with id: " + userId);
+        }
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+
+        Page<Post> postPage = postRepository.findPostsByUserId(userId, pageable);
+
+        List<PostResponse.PostDto> content = postPage.getContent()
+                .stream()
+                .map(this::mapToDto)
+                .toList();
+
+        log.info("[{}] Successfully fetched {} posts for user ID: {}", getTraceId(), content.size(), userId);
+
+        return new PageResponse<>(
+                content,
+                postPage.getNumber(),
+                postPage.getSize(),
+                postPage.getTotalElements(),
+                postPage.getTotalPages()
+        );
+    }
+
     @Transactional
     @Override
     public void deletePost(Long id, CustomUserDetails userDetails) {
