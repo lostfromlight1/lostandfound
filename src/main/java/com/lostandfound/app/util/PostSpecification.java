@@ -30,16 +30,19 @@ public class PostSpecification {
         };
     }
 
-    public static Specification<Post> hasDateRange(LocalDate startDate, LocalDate endDate) {
+    public static Specification<Post> hasLostFoundBetween(LocalDate start, LocalDate end) {
         return (root, query, cb) -> {
-            if (startDate != null && endDate != null) {
-                return cb.between(root.get("lostFoundDate"), startDate, endDate);
-            } else if (startDate != null) {
-                return cb.greaterThanOrEqualTo(root.get("lostFoundDate"), startDate);
-            } else if (endDate != null) {
-                return cb.lessThanOrEqualTo(root.get("lostFoundDate"), endDate);
+            if (start == null && end == null) return null;
+
+            if (start != null && end != null) {
+                return cb.between(root.get("lostFoundDate"), start, end);
             }
-            return null;
+
+            if (start != null) {
+                return cb.greaterThanOrEqualTo(root.get("lostFoundDate"), start);
+            }
+
+            return cb.lessThanOrEqualTo(root.get("lostFoundDate"), end);
         };
     }
 }

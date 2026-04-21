@@ -26,7 +26,10 @@ public class PostResponse {
             UserSummary user,
             CategoryDto category,
 
-            List<ImageDto> images
+            List<ImageDto> images,
+
+            Long LikeCount,
+            boolean liked
     ) {}
 
     public record UserSummary(

@@ -8,6 +8,8 @@ import com.lostandfound.app.model.MyanmarCity;
 import com.lostandfound.app.model.PostType;
 import com.lostandfound.app.security.CustomUserDetails;
 
+import java.time.LocalDate;
+
 public interface PostService {
 
 PostResponse.PostDto createPost(PostRequest.CreatePostRequest request, CustomUserDetails userDetailsService);
@@ -20,7 +22,12 @@ PostResponse.PostDto updatePost(Long id, PostRequest.UpdatePostRequest request,C
             PostType type,
             Long categoryId,
             MyanmarCity city,
-            String locationDetails
+            String locationDetails,
+            LocalDate startDate,
+            LocalDate endDate,
+            CustomUserDetails userDetails
+
+
     );
 
     PageResponse<PostResponse.PostDto> getUserPosts(Long userId, int page, int size);

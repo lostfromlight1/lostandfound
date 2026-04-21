@@ -2,6 +2,7 @@ package com.lostandfound.app.controller;
 
 import com.lostandfound.app.annotation.ApiId;
 import com.lostandfound.app.annotation.CheckSecurity;
+import com.lostandfound.app.annotation.CurrentUser;
 import com.lostandfound.app.dto.request.PostRequest;
 import com.lostandfound.app.dto.response.BaseResponse;
 import com.lostandfound.app.dto.response.PageResponse;
@@ -19,6 +20,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
 
 @Slf4j
 @RestController
@@ -65,11 +68,15 @@ public class PostController {
             @RequestParam(required = false) PostType type,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) MyanmarCity city,
-            @RequestParam(required = false) String locationDetails
+            @RequestParam(required = false) String locationDetails,
+            @RequestParam(required = false) LocalDate startDate,
+            @RequestParam(required = false) LocalDate endDate,
+            @CurrentUser CustomUserDetails userDetails
+
             ) {
 
         log.info("REST request to fetch posts list. Page: {}, Size: {}", page, size);
-        PageResponse<PostResponse.PostDto> response = postService.getAll(page, size, type, categoryId, city,locationDetails);
+        PageResponse<PostResponse.PostDto> response = postService.getAll(page, size, type, categoryId, city,locationDetails,startDate,endDate,userDetails);
         return BaseResponse.success("Posts fetched successfully", response);
     }
 
