@@ -102,7 +102,13 @@ public class RefreshTokenServiceImpl extends BaseService implements RefreshToken
         RefreshToken token = refreshTokenRepository.findByToken(hashedIncomingToken)
                 .orElseThrow(() -> new AppException(ErrorCode.TOKEN_INVALID, "Invalid refresh token"));
 
-        if(token.isRevoked()){
+        if (token.isRevoked()) {
+            if (token.getRevokedAt() != null && token.getRevokedAt().isAfter(Instant.now().minusSeconds(30))) {
+                log.warn("[{}] Token reuse within grace period for user ID: {}. Issuing new pair.",
+                        getTraceId(), token.getUser().getId());
+                return createRefreshToken(token.getUser().getId());
+            }
+
             log.error("[{}] REUSE DETECTED! Revoking all tokens for user: {}", getTraceId(), token.getUser().getId());
             refreshTokenRepository.revokeAllUserTokens(token.getUser().getId());
             throw new AppException(ErrorCode.TOKEN_INVALID, "Security breach detected. Please login again");
@@ -111,9 +117,12 @@ public class RefreshTokenServiceImpl extends BaseService implements RefreshToken
         verifyExpiration(token);
 
         token.setRevoked(true);
+        token.setRevokedAt(Instant.now());
         refreshTokenRepository.save(token);
 
-        log.info("[{}] Old token revoked. Issuing replacement for user ID: {}", getTraceId(), token.getUser().getId());
+        log.info("[{}] Old token revoked at {}. Issuing replacement for user ID: {}",
+                getTraceId(), token.getRevokedAt(), token.getUser().getId());
+
         return createRefreshToken(token.getUser().getId());
     }
 
