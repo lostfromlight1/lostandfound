@@ -42,6 +42,9 @@ public class Post extends BaseEntity {
 
     private String locationDetails;
 
+    private Double latitude;
+
+    private Double longitude;
 
     private LocalDate lostFoundDate;
 

@@ -45,7 +45,11 @@ public class PostRequest {
                 @Size(max = 255, message = "Location details are too long")
                 String locationDetails,
 
+                @NotNull(message = "Latitude is required")
+                Double latitude,
 
+                @NotNull(message = "Longitude is required")
+                Double longitude,
 
                 @NotNull(message = "Date is required")
                 LocalDate lostFoundDate,
@@ -82,6 +86,12 @@ public class PostRequest {
                 @NotBlank(message = "Location detail are require")
                 @Size(max = 255, message = "Location details are too long")
                 String locationDetails,
+
+                @NotNull(message = "Latitude is required")
+                Double latitude,
+
+                @NotNull(message = "Longitude is required")
+                Double longitude,
 
                 @NotNull(message = "Date is required")
                 LocalDate lostFoundDate,

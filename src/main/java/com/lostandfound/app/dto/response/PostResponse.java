@@ -17,6 +17,8 @@ public class PostResponse {
             PostStatus status,
             MyanmarCity city,
             String locationDetails,
+            Double latitude,
+            Double longitude,
             LocalDate lostFoundDate,
             String contactInfo,
             java.math.BigDecimal reward,

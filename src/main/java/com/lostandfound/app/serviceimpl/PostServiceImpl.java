@@ -56,29 +56,7 @@ public class PostServiceImpl implements PostService {
                 });
 
         try {
-            Post post = new Post();
-            post.setTitle(request.title());
-            post.setDescription(request.description());
-            post.setPostType(request.type());
-            post.setCity(request.city());
-            post.setLocationDetails(request.locationDetails());
-            post.setLostFoundDate(request.lostFoundDate());
-            post.setContactInfo(request.contactInfo());
-            post.setReward(request.reward());
-            post.setStatus(PostStatus.OPEN);
-            post.setUser(user);
-            post.setCategory(category);
-
-            if (request.images() != null && !request.images().isEmpty()) {
-                request.images().forEach(imgReq -> {
-                    PostImage postImage = PostImage.builder()
-                            .imageUrl(imgReq.url())
-                            .publicId(imgReq.publicId())
-                            .sortOrder(imgReq.sortOrder() != null ? imgReq.sortOrder() : 0)
-                            .build();
-                    post.addImage(postImage);
-                });
-            }
+            Post post = buildNewPost(request, user, category);
 
             Post savedPost = postRepository.save(post);
             log.info("[{}] Successfully created post ID: {}", getTraceId(), savedPost.getId());
@@ -116,6 +94,8 @@ public class PostServiceImpl implements PostService {
             post.setStatus(request.status());
             post.setCity(request.city());
             post.setLocationDetails(request.locationDetails());
+            post.setLatitude(request.latitude());
+            post.setLongitude(request.longitude());
             post.setContactInfo(request.contactInfo());
             post.setLostFoundDate(request.lostFoundDate());
             post.setCategory(category);
@@ -252,6 +232,35 @@ public class PostServiceImpl implements PostService {
         }
     }
 
+    private Post buildNewPost(PostRequest.CreatePostRequest request, User user, Category category) {
+        Post post = new Post();
+        post.setTitle(request.title());
+        post.setDescription(request.description());
+        post.setPostType(request.type());
+        post.setCity(request.city());
+        post.setLocationDetails(request.locationDetails());
+        post.setLatitude(request.latitude());
+        post.setLongitude(request.longitude());
+        post.setLostFoundDate(request.lostFoundDate());
+        post.setContactInfo(request.contactInfo());
+        post.setReward(request.reward());
+        post.setStatus(PostStatus.OPEN);
+        post.setUser(user);
+        post.setCategory(category);
+
+        if (request.images() != null && !request.images().isEmpty()) {
+            request.images().forEach(imgReq -> {
+                PostImage postImage = PostImage.builder()
+                        .imageUrl(imgReq.url())
+                        .publicId(imgReq.publicId())
+                        .sortOrder(imgReq.sortOrder() != null ? imgReq.sortOrder() : 0)
+                        .build();
+                post.addImage(postImage);
+            });
+        }
+        return post;
+    }
+
     private PostResponse.PostDto mapToDto(Post post) {
         List<PostResponse.ImageDto> imageDtos = post.getImages().stream()
                 .sorted(Comparator.comparingInt(PostImage::getSortOrder))
@@ -266,6 +275,8 @@ public class PostServiceImpl implements PostService {
                 post.getStatus(),
                 post.getCity(),
                 post.getLocationDetails(),
+                post.getLatitude(),
+                post.getLongitude(),
                 post.getLostFoundDate(),
                 post.getContactInfo(),
                 post.getReward(),
