@@ -41,3 +41,7 @@ out/
 .env.*
 *.env
 !.env.example
+
+# Firebase Service Account Key
+src/main/resources/firebase-service-account-key.json
+src/main/resources/lostandfound.json

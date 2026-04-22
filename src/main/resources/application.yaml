@@ -9,6 +9,24 @@ spring:
   profiles:
     active: dev
 
+    # --- New: WebSocket Configuration ---
+    messaging:
+      stomp:
+        relay:
+          host: localhost
+          port: 61613
+    websocket:
+      message-size: 16384
+
+    # --- New: Async Configuration ---
+    task:
+      execution:
+        pool:
+          core-size: 5
+          max-size: 20
+          queue-capacity: 100
+        thread-name-prefix: notification-
+
   servlet:
     multipart:
       max-file-size: 20MB
@@ -70,6 +88,11 @@ spring:
               - email
               - profile
             redirect-uri: "{baseUrl}/login/oauth2/code/google"
+
+# --- New: Firebase Configuration ---
+firebase:
+  enabled: true
+  credentials-file: classpath:firebase-service-account-key.json
 
 app:
   cookie:

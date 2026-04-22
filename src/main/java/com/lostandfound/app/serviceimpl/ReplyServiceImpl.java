@@ -11,6 +11,7 @@ import com.lostandfound.app.repository.CommentRepository;
 import com.lostandfound.app.repository.ReplyRepository;
 import com.lostandfound.app.repository.UserRepository;
 import com.lostandfound.app.security.CustomUserDetails;
+import com.lostandfound.app.service.NotificationService;
 import com.lostandfound.app.service.ReplyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,7 @@ public class ReplyServiceImpl implements ReplyService {
     private final ReplyRepository replyRepository;
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Override
     public ReplyResponse createReply(ReplyRequest.CreateReply request, CustomUserDetails currentUser) {
@@ -61,6 +63,22 @@ public class ReplyServiceImpl implements ReplyService {
 
             Reply savedReply = replyRepository.save(reply);
             log.info("[{}] Reply ID: {} created successfully for comment ID: {}", getTraceId(), savedReply.getId(), request.commentId());
+
+            if (!reply.getComment().getUser().getId().equals(currentUser.getId())) {
+                notificationService.notifyReplyOnComment(
+                        reply.getComment().getId(),
+                        currentUser.getId(),
+                        currentUser.getUsername()
+                );
+            }
+            if (reply.getReplyTo() != null &&
+                    !reply.getReplyTo().getUser().getId().equals(currentUser.getId())) {
+                notificationService.notifyReplyOnReply(
+                        reply.getReplyTo().getId(),
+                        currentUser.getId(),
+                        currentUser.getUsername()
+                );
+            }
 
             return ReplyResponse.fromEntity(savedReply);
         } catch (Exception e) {

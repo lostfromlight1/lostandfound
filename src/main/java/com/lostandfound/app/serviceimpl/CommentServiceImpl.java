@@ -15,6 +15,7 @@ import com.lostandfound.app.repository.ReplyRepository;
 import com.lostandfound.app.repository.UserRepository;
 import com.lostandfound.app.security.CustomUserDetails;
 import com.lostandfound.app.service.CommentService;
+import com.lostandfound.app.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -35,6 +36,7 @@ public class CommentServiceImpl implements CommentService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final ReplyRepository replyRepository;
+    private final NotificationService notificationService;
 
     @Override
     public CommentResponse createComment(CommentRequest.CreateComment request, CustomUserDetails currentUser) {
@@ -57,6 +59,14 @@ public class CommentServiceImpl implements CommentService {
 
             Comment savedComment = commentRepository.save(comment);
             log.info("[{}] Comment ID: {} created successfully", getTraceId(), savedComment.getId());
+
+            if (!savedComment.getPost().getUser().getId().equals(currentUser.getId())) {
+                notificationService.notifyCommentOnPost(
+                        savedComment.getPost().getId(),
+                        currentUser.getId(),
+                        currentUser.getUsername()
+                );
+            }
 
             return CommentResponse.fromEntity(savedComment);
         } catch (Exception e) {

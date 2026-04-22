@@ -59,9 +59,25 @@ dependencies {
     // Logging
     implementation 'net.logstash.logback:logstash-logback-encoder:7.4'
 
+    // WebSocket & STOMP
+    implementation 'org.springframework.boot:spring-boot-starter-websocket:3.5.11'
+
+    // Firebase Admin SDK
+    implementation 'com.google.firebase:firebase-admin:9.2.0'
+
+    // SockJS & STOMP Client
+    implementation 'org.webjars:sockjs-client:1.5.1'
+    implementation 'org.webjars:stomp-websocket:2.3.4'
+
+    // Spring Messaging
+    implementation 'org.springframework:spring-messaging:6.2.8'
+    implementation 'org.springframework:spring-context:6.2.8'
+
     // Testing
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
+
+
 }
 
 tasks.named('test') {
