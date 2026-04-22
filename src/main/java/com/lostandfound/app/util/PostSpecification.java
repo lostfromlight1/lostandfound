@@ -2,6 +2,7 @@ package com.lostandfound.app.util;
 
 import com.lostandfound.app.model.MyanmarCity;
 import com.lostandfound.app.model.Post;
+import com.lostandfound.app.model.PostStatus;
 import com.lostandfound.app.model.PostType;
 import org.springframework.data.jpa.domain.Specification;
 import java.time.LocalDate;
@@ -45,4 +46,6 @@ public class PostSpecification {
             return cb.lessThanOrEqualTo(root.get("lostFoundDate"), end);
         };
     }
+
+
 }
