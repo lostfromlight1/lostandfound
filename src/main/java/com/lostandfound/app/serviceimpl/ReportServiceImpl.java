@@ -1,6 +1,7 @@
 package com.lostandfound.app.serviceimpl;
 
 import com.lostandfound.app.dto.request.CreateReportRequest;
+import com.lostandfound.app.dto.request.ReportActionRequest;
 import com.lostandfound.app.dto.response.PageResponse;
 import com.lostandfound.app.dto.response.ReportResponse;
 import com.lostandfound.app.model.*;
@@ -125,6 +126,66 @@ protected final CommentRepository commentRepository;
                 reportPage.getTotalElements(),
                 reportPage.getTotalPages()
         );
+    }
+
+    @Override
+    @Transactional
+    public void resolveReport(Long reportId, ReportActionRequest request) {
+
+        Report report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new RuntimeException("Report not found"));
+
+        if (report.getStatus() != ReportStatus.PENDING) {
+            throw new RuntimeException("Report already handled");
+        }
+
+
+        switch (report.getTargetType()) {
+
+            case POST -> {
+                Post post = postRepository.findById(report.getTargetId())
+                        .orElseThrow(() -> new RuntimeException("Post not found"));
+
+                post.setStatus(PostStatus.HIDDEN);
+                postRepository.save(post);
+            }
+
+            case COMMENT -> {
+                Comment comment = commentRepository.findById(report.getTargetId())
+                        .orElseThrow(() -> new RuntimeException("Comment not found"));
+
+                comment.softDelete();
+            }
+
+            case USER -> {
+                User user = userRepository.findById(report.getTargetId())
+                        .orElseThrow(() -> new RuntimeException("User not found"));
+
+                user.setActive(false); // 🔥 BAN USER
+            }
+        }
+
+        report.setStatus(ReportStatus.RESOLVED);
+        report.setAdminNote(request.adminNote());
+
+        reportRepository.save(report);
+    }
+
+
+    @Transactional
+    public void rejectReport(Long reportId, ReportActionRequest request) {
+
+        Report report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new RuntimeException("Report not found"));
+
+        if (report.getStatus() != ReportStatus.PENDING) {
+            throw new RuntimeException("Report already handled");
+        }
+
+        report.setStatus(ReportStatus.REJECTED);
+        report.setAdminNote(request.adminNote());
+
+        reportRepository.save(report);
     }
 
 

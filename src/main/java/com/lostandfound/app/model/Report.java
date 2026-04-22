@@ -33,4 +33,7 @@ public class Report extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     private ReportStatus status; // PENDING, RESOLVED, REJECTED
+
+    @Column(length = 500)
+    private String adminNote;
 }
