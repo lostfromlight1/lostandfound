@@ -5,6 +5,7 @@ import com.lostandfound.app.model.PostStatus;
 import com.lostandfound.app.model.PostType;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class PostResponse {
@@ -20,6 +21,7 @@ public class PostResponse {
             Double latitude,
             Double longitude,
             LocalDate lostFoundDate,
+            LocalDateTime createdAt,
             String contactInfo,
             java.math.BigDecimal reward,
 

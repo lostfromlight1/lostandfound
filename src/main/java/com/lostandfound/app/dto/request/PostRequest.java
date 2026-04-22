@@ -39,16 +39,14 @@ public class PostRequest {
                 Long categoryId,
 
                 @NotNull(message = "City is required")
-                 MyanmarCity city,
+                MyanmarCity city,
 
                 @NotBlank(message = "Location detail are require")
                 @Size(max = 255, message = "Location details are too long")
                 String locationDetails,
 
-                @NotNull(message = "Latitude is required")
                 Double latitude,
 
-                @NotNull(message = "Longitude is required")
                 Double longitude,
 
                 @NotNull(message = "Date is required")
@@ -87,10 +85,8 @@ public class PostRequest {
                 @Size(max = 255, message = "Location details are too long")
                 String locationDetails,
 
-                @NotNull(message = "Latitude is required")
                 Double latitude,
 
-                @NotNull(message = "Longitude is required")
                 Double longitude,
 
                 @NotNull(message = "Date is required")

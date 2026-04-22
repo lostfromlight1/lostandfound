@@ -123,6 +123,26 @@ public class CommentServiceImpl implements CommentService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public CommentResponse getCommentById(Long id) {
+        Comment comment = commentRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Comment not found"));
+
+        List<Reply> rootReplies = replyRepository.findActiveRootRepliesByCommentId(comment.getId());
+        List<ReplyResponse> replyResponses = rootReplies.stream()
+                .map(reply -> {
+                    List<Reply> nestedReplies = replyRepository.findActiveNestedRepliesByReplyId(reply.getId());
+                    List<ReplyResponse> nestedResponses = nestedReplies.stream()
+                            .map(ReplyResponse::fromEntity)
+                            .toList();
+                    return ReplyResponse.fromEntityWithNestedReplies(reply, nestedResponses);
+                })
+                .toList();
+
+        return CommentResponse.fromEntityWithReplies(comment, replyResponses);
+    }
+
+    @Override
     public void deleteComment(Long commentId, CustomUserDetails currentUser) {
         log.info("[{}] Deleting comment ID: {} by user ID: {}", getTraceId(), commentId, currentUser.getId());
 
