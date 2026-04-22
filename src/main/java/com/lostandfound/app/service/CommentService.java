@@ -15,4 +15,6 @@ public interface CommentService {
     CommentResponse updateComment(Long commentId, CommentRequest.UpdateComment request, CustomUserDetails currentUser);
 
     void deleteComment(Long commentId, CustomUserDetails currentUser);
+
+    CommentResponse getCommentById(Long id);
 }

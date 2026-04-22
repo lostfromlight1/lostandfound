@@ -105,4 +105,16 @@ public class PostController {
         PageResponse<PostResponse.PostDto> response = postService.getUserPosts(userId, page, size);
         return BaseResponse.success("User's posts fetched successfully", response);
     }
+
+    @GetMapping("/{id}")
+    @ApiId("PST-006")
+    @Operation(summary = "Get Post by ID", description = "Fetches a single post by its ID.")
+    public ResponseEntity<BaseResponse<PostResponse.PostDto>> getPostById(
+            @PathVariable Long id,
+            @Parameter(hidden = true) @CurrentUser CustomUserDetails userDetails) {
+
+        log.info("REST request to fetch post ID: {}", id);
+        PostResponse.PostDto response = postService.getPostById(id, userDetails);
+        return BaseResponse.success("Post fetched successfully", response);
+    }
 }

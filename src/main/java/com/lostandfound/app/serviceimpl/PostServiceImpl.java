@@ -125,6 +125,16 @@ public class PostServiceImpl implements PostService {
 
     @Transactional(readOnly = true)
     @Override
+    public PostResponse.PostDto getPostById(Long id, CustomUserDetails userDetails) {
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Post not found"));
+
+        Long currentUserId = (userDetails != null) ? userDetails.getId() : null;
+        return mapToDto(post, currentUserId);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
     public PageResponse<PostResponse.PostDto> getAll(
             int page, int size, PostType type, Long categoryId,
             MyanmarCity city, String locationDetails, LocalDate startDate, LocalDate endDate,

@@ -78,4 +78,14 @@ public class CommentController {
         commentService.deleteComment(id, currentUser);
         return BaseResponse.success("Comment has been deleted successfully");
     }
+
+    @GetMapping("/{id}")
+    @ApiId("CMT-005")
+    @Operation(summary = "Get Comment by ID", description = "Fetches a single comment by its ID.")
+    public ResponseEntity<BaseResponse<CommentResponse>> getCommentById(@PathVariable Long id) {
+
+        log.info("REST request to fetch comment ID: {}", id);
+        CommentResponse response = commentService.getCommentById(id);
+        return BaseResponse.success("Comment fetched successfully", response);
+    }
 }
