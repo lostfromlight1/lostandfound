@@ -1,5 +1,6 @@
 package com.lostandfound.app.repository;
 
+import com.lostandfound.app.model.Role;
 import com.lostandfound.app.model.User;
 import io.micrometer.common.lang.NonNull;
 import org.springframework.data.domain.Page;
@@ -9,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -32,4 +34,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
                   OR LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))
             """)
     Page<User> searchUsers(@Param("query") String query, @NonNull Pageable pageable);
+
+    @Query("""
+        SELECT u FROM User u
+        WHERE u.role = :role AND u.active = true
+    """)
+    List<User> findByRole(@Param("role") Role role);
 }

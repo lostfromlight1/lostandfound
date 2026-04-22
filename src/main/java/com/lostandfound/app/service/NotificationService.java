@@ -142,6 +142,23 @@ public interface NotificationService {
      */
     void notifyPostLiked(Long postId, Long likerId, String likerName);
 
+
+    // 🔴 Report notification methods
+    /**
+     * Notify all admins about new report submission
+     */
+    void notifyReportSubmitted(Long reportId, String reporterName, String targetType, Long targetId);
+
+    /**
+     * Notify reporter that their report has been resolved
+     */
+    void notifyReportResolved(Long reportId, Long reporterId, String targetType);
+
+    /**
+     * Notify reporter that their report has been rejected
+     */
+    void notifyReportRejected(Long reportId, Long reporterId, String targetType);
+
     /**
      * Send pending push notifications
      * Run periodically to send FCM notifications

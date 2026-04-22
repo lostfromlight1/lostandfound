@@ -6,7 +6,13 @@ public enum NotificationType {
     REPLY_TO_REPLY("Reply to your reply"),
     POST_LIKED("Someone liked your post"),
     MENTION("You were mentioned"),
-    POST_STATUS_CHANGED("Your post status changed");
+    POST_STATUS_CHANGED("Your post status changed"),
+
+    // Report notifications
+    REPORT_SUBMITTED("New report submitted"),
+    REPORT_RESOLVED("Your report has been resolved"),
+    REPORT_REJECTED("Your report has been rejected");
+
 
     private final String description;
 

@@ -10,6 +10,7 @@ import com.lostandfound.app.repository.PostRepository;
 import com.lostandfound.app.repository.ReportRepository;
 import com.lostandfound.app.repository.UserRepository;
 import com.lostandfound.app.security.CustomUserDetails;
+import com.lostandfound.app.service.NotificationService;
 import com.lostandfound.app.service.ReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -33,7 +34,8 @@ public class ReportServiceImpl implements ReportService {
     private final UserRepository userRepository;
     private final PostRepository postRepository;
     private final ReportRepository reportRepository;
-protected final CommentRepository commentRepository;
+    private final CommentRepository commentRepository;
+    private final NotificationService notificationService;
 
 
     @Override
@@ -79,6 +81,13 @@ protected final CommentRepository commentRepository;
         report.setStatus(ReportStatus.PENDING);
 
         reportRepository.save(report);
+
+        notificationService.notifyReportSubmitted(
+                report.getId(),
+                user.getDisplayName(),
+                request.targetType().toString(),
+                request.targetId()
+        );
 
         // 🔥 4. AUTO ACTION (only for POST)
         if (request.targetType() == ReportTargetType.POST) {
@@ -169,6 +178,12 @@ protected final CommentRepository commentRepository;
         report.setAdminNote(request.adminNote());
 
         reportRepository.save(report);
+
+        notificationService.notifyReportResolved(
+                report.getId(),
+                report.getReportedBy().getId(),
+                report.getTargetType().toString()
+        );
     }
 
 
@@ -186,6 +201,12 @@ protected final CommentRepository commentRepository;
         report.setAdminNote(request.adminNote());
 
         reportRepository.save(report);
+
+        notificationService.notifyReportRejected(
+                report.getId(),
+                report.getReportedBy().getId(),
+                report.getTargetType().toString()
+        );
     }
 
 

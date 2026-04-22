@@ -352,6 +352,76 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Async("notificationExecutor")
+    public void notifyReportSubmitted(Long reportId, String reporterName, String targetType, Long targetId) {
+        log.info("[{}] Notifying admins about report ID: {}", getTraceId(), reportId);
+
+        // Get all admin users
+        List<User> admins = userRepository.findByRole(Role.ADMIN);
+
+        String title = reporterName + " submitted a report";
+        String message = "New " + targetType + " report - ID: " + targetId;
+
+        for (User admin : admins) {
+            if (admin.getId() != null) {
+                createNotification(new NotificationRequest.InternalNotificationRequest(
+                        admin.getId(),  // recipientId (admin)
+                        0L,             // userId (system)
+                        NotificationType.REPORT_SUBMITTED,
+                        title,
+                        message,
+                        null,           // postId
+                        null,           // commentId
+                        null,           // replyId
+                        null
+                ));
+            }
+        }
+    }
+
+    @Override
+    @Async("notificationExecutor")
+    public void notifyReportResolved(Long reportId, Long reporterId, String targetType) {
+        log.info("[{}] Notifying reporter ID: {} about resolved report ID: {}", getTraceId(), reporterId, reportId);
+
+        String title = "Your report has been resolved";
+        String message = "The " + targetType + " you reported has been reviewed by our moderation team.";
+
+        createNotification(new NotificationRequest.InternalNotificationRequest(
+                reporterId,  // recipientId (reporter)
+                0L,          // userId (system)
+                NotificationType.REPORT_RESOLVED,
+                title,
+                message,
+                null,
+                null,
+                null,
+                null
+        ));
+    }
+
+    @Override
+    @Async("notificationExecutor")
+    public void notifyReportRejected(Long reportId, Long reporterId, String targetType) {
+        log.info("[{}] Notifying reporter ID: {} about rejected report ID: {}", getTraceId(), reporterId, reportId);
+
+        String title = "Your report has been rejected";
+        String message = "After review, the " + targetType + " does not violate our community guidelines.";
+
+        createNotification(new NotificationRequest.InternalNotificationRequest(
+                reporterId,  // recipientId (reporter)
+                0L,          // userId (system)
+                NotificationType.REPORT_REJECTED,
+                title,
+                message,
+                null,
+                null,
+                null,
+                null
+        ));
+    }
+
+    @Override
+    @Async("notificationExecutor")
     public void sendPendingPushNotifications() {
         log.info("[{}] Sending pending FCM push notifications", getTraceId());
 
