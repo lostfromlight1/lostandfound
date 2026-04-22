@@ -11,7 +11,6 @@ import com.lostandfound.app.repository.PostLikeRepository;
 import com.lostandfound.app.repository.PostRepository;
 import com.lostandfound.app.repository.UserRepository;
 import com.lostandfound.app.security.CustomUserDetails;
-import com.lostandfound.app.service.ImageService;
 import com.lostandfound.app.service.PostService;
 import com.lostandfound.app.util.PostSpecification;
 import org.slf4j.MDC;
@@ -26,7 +25,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Comparator;
 import java.util.Objects;
@@ -39,7 +37,6 @@ public class PostServiceImpl implements PostService {
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
     private final PostRepository postRepository;
-    private final ImageService imageService;
     private final PostLikeRepository postLikeRepository;
 
     @Override
@@ -115,16 +112,16 @@ public class PostServiceImpl implements PostService {
         log.info("[{}] Fetching posts. Page: {}, Size: {}", getTraceId(), page, size);
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
-        Specification<Post> spec = Specification
-                .where(PostSpecification.hasType(type))
-                .and(PostSpecification.hasCategory(categoryId))
-                .and(PostSpecification.hasCity(city))
-                .and(PostSpecification.hasLocationDetails(locationDetails))
-                .and(PostSpecification.hasLostFoundBetween(startDate, endDate));
+        Specification<Post> spec = Specification.allOf(
+                PostSpecification.hasType(type),
+                PostSpecification.hasCategory(categoryId),
+                PostSpecification.hasCity(city),
+                PostSpecification.hasLocationDetails(locationDetails),
+                PostSpecification.hasLostFoundBetween(startDate, endDate)
+        );
 
         Page<Post> postPage = postRepository.findAll(spec, pageable);
 
-        // Pass the current user ID to mapToDto to determine "liked" status
         Long currentUserId = (userDetails != null) ? userDetails.getId() : null;
 
         List<PostResponse.PostDto> content = postPage.getContent()
@@ -203,6 +200,7 @@ public class PostServiceImpl implements PostService {
                 post.getLatitude(),
                 post.getLongitude(),
                 post.getLostFoundDate(),
+                post.getCreatedAt(),
                 post.getContactInfo(),
                 post.getReward(),
                 new PostResponse.UserSummary(
