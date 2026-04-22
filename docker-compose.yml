@@ -12,7 +12,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      # This tells Docker to ping the DB until it is fully ready
       test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME}"]
       interval: 5s
       timeout: 5s
@@ -22,6 +21,10 @@ services:
     build: .
     container_name: lostandfound-app
     restart: unless-stopped
+    # Add Google's public DNS servers so the container can reach the internet
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     depends_on:
       db:
         condition: service_healthy

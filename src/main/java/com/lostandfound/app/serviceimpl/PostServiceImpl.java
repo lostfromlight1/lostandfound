@@ -25,6 +25,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Comparator;
 import java.util.Objects;
@@ -96,7 +97,27 @@ public class PostServiceImpl implements PostService {
         post.setLostFoundDate(request.lostFoundDate());
         post.setCategory(category);
 
-        // Image update logic remains here...
+        // --- IMAGE MAPPING LOGIC ---
+        if (post.getImages() == null) {
+            post.setImages(new ArrayList<>());
+        } else {
+            post.getImages().clear();
+        }
+
+        if (request.images() != null && !request.images().isEmpty()) {
+            List<PostImage> newImages = request.images().stream().map(imgReq -> {
+                PostImage img = new PostImage();
+                // Map from Record DTO -> Entity
+                img.setImageUrl(imgReq.url());
+                img.setPublicId(imgReq.publicId());
+                img.setSortOrder(imgReq.sortOrder() != null ? imgReq.sortOrder() : 0);
+                img.setPost(post);
+                return img;
+            }).toList();
+
+            post.getImages().addAll(newImages);
+        }
+        // ---------------------------
 
         Post updatedPost = postRepository.save(post);
         return mapToDto(updatedPost, userId);
@@ -177,6 +198,25 @@ public class PostServiceImpl implements PostService {
         post.setStatus(PostStatus.OPEN);
         post.setUser(user);
         post.setCategory(category);
+
+        // --- IMAGE MAPPING LOGIC ---
+        post.setImages(new ArrayList<>());
+
+        if (request.images() != null && !request.images().isEmpty()) {
+            List<PostImage> newImages = request.images().stream().map(imgReq -> {
+                PostImage img = new PostImage();
+                // Map from Record DTO -> Entity
+                img.setImageUrl(imgReq.url());
+                img.setPublicId(imgReq.publicId());
+                img.setSortOrder(imgReq.sortOrder() != null ? imgReq.sortOrder() : 0);
+                img.setPost(post);
+                return img;
+            }).toList();
+
+            post.getImages().addAll(newImages);
+        }
+        // ---------------------------
+
         return post;
     }
 
