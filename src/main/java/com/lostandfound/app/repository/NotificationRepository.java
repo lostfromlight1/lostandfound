@@ -124,12 +124,12 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     );
 
     @Query(value = """
-        SELECT * FROM notifications n
-        WHERE n.push_sent = false 
-        AND n.fcm_token IS NOT NULL 
-        AND n.active = true
-        LIMIT 100
-    """, nativeQuery = true)
+    SELECT * FROM notifications n
+    WHERE n.push_sent = false 
+    AND n.fcm_token IS NOT NULL 
+    AND n.is_active = true    
+    LIMIT 100
+""", nativeQuery = true)
     List<Notification> findNotificationsPendingPush();
 
 
