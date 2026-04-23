@@ -269,7 +269,8 @@ public class AuthServiceImpl extends BaseService implements AuthService {
         if (user == null || user.getProvider() == AuthProvider.GOOGLE) return;
 
         passwordResetTokenRepository.deleteByUser_Id(user.getId());
-        String resetToken = UUID.randomUUID().toString();
+
+        String resetToken = generateVerificationCode();
 
         PasswordResetToken tokenEntity = PasswordResetToken.builder()
                 .token(resetToken)
@@ -277,7 +278,8 @@ public class AuthServiceImpl extends BaseService implements AuthService {
                 .expiresAt(Instant.now().plus(15, ChronoUnit.MINUTES))
                 .build();
         passwordResetTokenRepository.save(tokenEntity);
-        emailService.sendPasswordResetEmail(email, frontendUrl + "/reset-password?token=" + resetToken);
+
+        emailService.sendPasswordResetEmail(email, resetToken);
     }
 
     @Override
