@@ -92,4 +92,18 @@ public class ReportController {
         reportService.rejectReport(id, request);
         return BaseResponse.success("Report rejected successfully");
     }
+
+    // --- NEW: RESTORE ENDPOINT ---
+    @PostMapping("/{id}/restore")
+    @CheckSecurity.Admin.isRequired
+    @ApiId("RPT-005")
+    @Operation(summary = "Restore Target", description = "Restores a previously deleted target and sets report to REJECTED.")
+    public ResponseEntity<BaseResponse<Void>> restoreTarget(
+            @PathVariable Long id,
+            @Parameter(hidden = true) @CurrentUser CustomUserDetails userDetails) {
+
+        log.info("REST request to RESTORE target for report ID: {} by admin: {}", id, userDetails.getId());
+        reportService.restoreTarget(id);
+        return BaseResponse.success("Target restored successfully");
+    }
 }
