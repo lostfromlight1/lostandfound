@@ -37,7 +37,6 @@ public class ReportServiceImpl implements ReportService {
     private final CommentRepository commentRepository;
     private final NotificationService notificationService;
 
-    // FIX: Inject EntityManager so we can bypass @SQLRestriction when restoring data
     private final EntityManager entityManager;
 
     @Override
@@ -87,7 +86,6 @@ public class ReportServiceImpl implements ReportService {
                 request.targetId()
         );
 
-        // 🔥 4. AUTO ACTION (only for POST)
         if (request.targetType() == ReportTargetType.POST) {
             long count = reportRepository.countByTargetTypeAndTargetId(
                     ReportTargetType.POST,
@@ -98,6 +96,7 @@ public class ReportServiceImpl implements ReportService {
                 Post post = postRepository.findById(request.targetId()).orElseThrow();
                 post.setStatus(PostStatus.HIDDEN);
                 postRepository.save(post);
+
             }
         }
     }
@@ -204,7 +203,6 @@ public class ReportServiceImpl implements ReportService {
         );
     }
 
-    // --- NEW RESTORE METHOD ---
     @Override
     @Transactional
     public void restoreTarget(Long reportId) {
@@ -213,19 +211,16 @@ public class ReportServiceImpl implements ReportService {
 
         switch (report.getTargetType()) {
             case POST -> {
-                // Use EntityManager directly to bypass the @SQLRestriction("is_active = true")
                 Post post = entityManager.find(Post.class, report.getTargetId());
                 if (post == null) throw new RuntimeException("Post not found in database");
 
                 post.setStatus(PostStatus.OPEN);
-                // Also reset active flag just in case it was soft deleted
                 post.setActive(true);
                 post.setDeletedAt(null);
 
                 entityManager.merge(post);
             }
             case COMMENT -> {
-                // Use EntityManager directly to bypass the @SQLRestriction("is_active = true")
                 Comment comment = entityManager.find(Comment.class, report.getTargetId());
                 if (comment == null) throw new RuntimeException("Comment not found in database");
 
@@ -235,7 +230,6 @@ public class ReportServiceImpl implements ReportService {
                 entityManager.merge(comment);
             }
             case USER -> {
-                // Use EntityManager directly to bypass the @SQLRestriction("is_active = true")
                 User user = entityManager.find(User.class, report.getTargetId());
                 if (user == null) throw new RuntimeException("User not found in database");
 
@@ -247,10 +241,15 @@ public class ReportServiceImpl implements ReportService {
             }
         }
 
-        // Set the report to REJECTED (meaning "we looked at it and decided the content is safe")
         report.setStatus(ReportStatus.REJECTED);
         report.setAdminNote("Restored by admin");
         reportRepository.save(report);
+
+        notificationService.notifyReportRejected(
+                report.getId(),
+                report.getReportedBy().getId(),
+                report.getTargetType().toString()
+        );
     }
 
     private ReportResponse.ReportDto mapToDto(Report report) {
