@@ -10,10 +10,6 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Notification WebSocket Handler
- * Handles real-time notification delivery via STOMP
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -22,12 +18,6 @@ public class NotificationWebSocketHandler {
     private final SimpMessagingTemplate messagingTemplate;
     private final ObjectMapper objectMapper;
 
-    /**
-     * Send notification to a specific user via WebSocket
-     *
-     * @param userId Recipient user ID
-     * @param notification Notification object
-     */
     public void sendNotificationToUser(Long userId, NotificationResponse.WebSocketNotification notification) {
         try {
             String destination = "/queue/notifications/" + userId;
@@ -38,11 +28,6 @@ public class NotificationWebSocketHandler {
         }
     }
 
-    /**
-     * Send notification to all users (broadcast)
-     *
-     * @param notification Notification object
-     */
     public void broadcastNotification(NotificationResponse.WebSocketNotification notification) {
         try {
             messagingTemplate.convertAndSend("/topic/notifications", notification);
@@ -52,12 +37,6 @@ public class NotificationWebSocketHandler {
         }
     }
 
-    /**
-     * Send unread count update to specific user
-     *
-     * @param userId User ID
-     * @param unreadCount Unread notification count
-     */
     public void sendUnreadCountUpdate(Long userId, long unreadCount) {
         try {
             Map<String, Object> update = new HashMap<>();
@@ -73,12 +52,6 @@ public class NotificationWebSocketHandler {
         }
     }
 
-    /**
-     * Send real-time typing indicator
-     *
-     * @param userId Typing user ID
-     * @param isTyping Typing status
-     */
     public void sendTypingIndicator(Long userId, boolean isTyping) {
         try {
             Map<String, Object> indicator = new HashMap<>();

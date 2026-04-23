@@ -7,10 +7,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
 
-/**
- * Async Configuration
- * Configures thread pool for async notification operations
- */
+
 @Configuration
 @EnableAsync
 public class AsyncConfig {

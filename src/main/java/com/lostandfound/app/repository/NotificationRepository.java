@@ -17,9 +17,6 @@ import java.util.List;
 @Repository
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
 
-    /**
-     * Get paginated notifications for a recipient
-     */
     @Query("""
         SELECT n FROM Notification n
         WHERE n.recipient.id = :recipientId AND n.active = true
@@ -27,9 +24,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     """)
     Page<Notification> findByRecipientId(@Param("recipientId") Long recipientId, Pageable pageable);
 
-    /**
-     * Get unread notifications count for a recipient
-     */
     @Query("""
         SELECT COUNT(n) FROM Notification n
         WHERE n.recipient.id = :recipientId 
@@ -38,9 +32,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     """)
     long countUnreadByRecipientId(@Param("recipientId") Long recipientId);
 
-    /**
-     * Get all unread notifications for a recipient
-     */
     @Query("""
         SELECT n FROM Notification n
         WHERE n.recipient.id = :recipientId 
@@ -50,9 +41,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     """)
     List<Notification> findUnreadByRecipientId(@Param("recipientId") Long recipientId);
 
-    /**
-     * Get notifications by type
-     */
     @Query("""
         SELECT n FROM Notification n
         WHERE n.recipient.id = :recipientId 
@@ -66,9 +54,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             Pageable pageable
     );
 
-    /**
-     * Get notifications related to a specific post
-     */
+
     @Query("""
         SELECT n FROM Notification n
         WHERE n.postId = :postId 
@@ -77,9 +63,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     """)
     List<Notification> findByPostId(@Param("postId") Long postId);
 
-    /**
-     * Get notifications related to a specific comment
-     */
+
     @Query("""
         SELECT n FROM Notification n
         WHERE n.commentId = :commentId 
@@ -88,9 +72,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     """)
     List<Notification> findByCommentId(@Param("commentId") Long commentId);
 
-    /**
-     * Get notifications related to a specific reply
-     */
+
     @Query("""
         SELECT n FROM Notification n
         WHERE n.replyId = :replyId 
@@ -99,9 +81,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     """)
     List<Notification> findByReplyId(@Param("replyId") Long replyId);
 
-    /**
-     * Mark all notifications as read for a recipient
-     */
+
     @Modifying
     @Query("""
         UPDATE Notification n
@@ -112,9 +92,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     """)
     int markAllAsReadByRecipientId(@Param("recipientId") Long recipientId);
 
-    /**
-     * Delete old notifications (older than specified date)
-     */
+
     @Modifying
     @Query("""
         UPDATE Notification n
@@ -127,9 +105,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             @Param("beforeDate") LocalDateTime beforeDate
     );
 
-    /**
-     * Check if notification already exists (to prevent duplicates)
-     */
+
     @Query("""
         SELECT CASE WHEN COUNT(n) > 0 THEN true ELSE false END
         FROM Notification n
@@ -147,9 +123,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             @Param("postId") Long postId
     );
 
-    /**
-     * Find notifications that need FCM push (not yet sent)
-     */
     @Query(value = """
         SELECT * FROM notifications n
         WHERE n.push_sent = false 
@@ -160,9 +133,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     List<Notification> findNotificationsPendingPush();
 
 
-    /**
-     * Get notifications by user who triggered it (for analytics)
-     */
     @Query("""
         SELECT n FROM Notification n
         WHERE n.user.id = :userId 

@@ -1,5 +1,7 @@
 package com.lostandfound.app.serviceimpl;
 
+import com.lostandfound.app.exception.AppException;
+import com.lostandfound.app.exception.ErrorCode;
 import com.lostandfound.app.model.Post;
 import com.lostandfound.app.model.PostLike;
 import com.lostandfound.app.model.User;
@@ -35,7 +37,8 @@ public class PostLikeServiceImpl implements PostLikeService {
         } else {
             // ✅ Like
             // Use getReferenceById to avoid unnecessary SELECT queries
-            Post post = postRepository.getReferenceById(postId);
+            Post post = postRepository.findById(postId)
+                    .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Post not found"));
             User user = userRepository.getReferenceById(userId);
 
             PostLike like = new PostLike();

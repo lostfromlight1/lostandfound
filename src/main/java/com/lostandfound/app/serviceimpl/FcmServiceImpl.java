@@ -15,10 +15,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * FCM Service Implementation
- * Sends push notifications using Firebase Cloud Messaging
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -73,7 +69,12 @@ public class FcmServiceImpl implements FcmService {
             return false;
         }
 
-        // Create data payload
+
+        if (notification.fcmToken() == null || notification.fcmToken().isEmpty()) {
+            log.debug("No FCM token available for notification ID: {}", notification.id());
+            return false;
+        }
+
         Map<String, String> data = new HashMap<>();
         data.put("notificationId", String.valueOf(notification.id()));
         data.put("type", notification.type().toString());
@@ -87,10 +88,13 @@ public class FcmServiceImpl implements FcmService {
             data.put("replyId", String.valueOf(notification.replyId()));
         }
 
-        // Send to recipient's FCM token if available
-        // In real scenario, you would fetch user's device tokens from database
-        // For now, we're assuming FCM token is stored in notification
-        return true;
+        // Send to recipient's FCM token
+        return sendPushNotification(
+                notification.fcmToken(),
+                notification.title(),
+                notification.message(),
+                data
+        );
     }
 
     @Override

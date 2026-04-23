@@ -6,8 +6,7 @@ import com.lostandfound.app.dto.response.PageResponse;
 import com.lostandfound.app.exception.AppException;
 import com.lostandfound.app.exception.ErrorCode;
 import com.lostandfound.app.model.*;
-import com.lostandfound.app.repository.NotificationRepository;
-import com.lostandfound.app.repository.UserRepository;
+import com.lostandfound.app.repository.*;
 import com.lostandfound.app.security.CustomUserDetails;
 import com.lostandfound.app.service.FcmService;
 import com.lostandfound.app.service.NotificationService;
@@ -23,13 +22,10 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Notification Service Implementation
- * Handles all notification-related operations with async support
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -40,6 +36,10 @@ public class NotificationServiceImpl implements NotificationService {
     private final UserRepository userRepository;
     private final FcmService fcmService;
     private final NotificationWebSocketHandler webSocketHandler;
+
+    private final PostRepository postRepository;
+    private final CommentRepository commentRepository;
+    private final ReplyRepository replyRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -183,14 +183,16 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    @Transactional
     public NotificationResponse.FcmTokenResponse saveFcmToken(Long userId, String fcmToken) {
         log.info("[{}] Saving FCM token for user ID: {}", getTraceId(), userId);
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "User not found"));
 
-        // Note: In real implementation, you'd have a separate table for device tokens
-        // For now, we're storing in notification object
+        user.setFcmToken(fcmToken);
+        userRepository.save(user);
+
         log.info("[{}] FCM token saved for user ID: {}", getTraceId(), userId);
 
         return NotificationResponse.FcmTokenResponse.builder()
@@ -267,15 +269,20 @@ public class NotificationServiceImpl implements NotificationService {
     public void notifyCommentOnPost(Long postId, Long commenterId, String commenterName) {
         log.info("[{}] Notifying post owner about comment on post ID: {}", getTraceId(), postId);
 
-        // Fetch post to get owner
-        // In real implementation, you'd use PostRepository
-        // For now, this is a placeholder
+        Long recipientId = postRepository.findById(postId)
+                .map(post -> post.getUser().getId())
+                .orElse(null);
+
+        if (recipientId == null) {
+            log.warn("Post not found or has no owner for ID: {}", postId);
+            return;
+        }
 
         String title = commenterName + " commented on your post";
         String message = "Check out the new comment";
 
         createNotification(new NotificationRequest.InternalNotificationRequest(
-                null, // recipientId - to be fetched from post
+                recipientId,
                 commenterId,
                 NotificationType.COMMENT_CREATED,
                 title,
@@ -292,11 +299,17 @@ public class NotificationServiceImpl implements NotificationService {
     public void notifyReplyOnComment(Long commentId, Long replyerId, String replierName) {
         log.info("[{}] Notifying comment owner about reply on comment ID: {}", getTraceId(), commentId);
 
+        Long recipientId = commentRepository.findById(commentId)
+                .map(comment -> comment.getUser().getId())
+                .orElse(null);
+
+        if (recipientId == null) return;
+
         String title = replierName + " replied to your comment";
         String message = "Check out the new reply";
 
         createNotification(new NotificationRequest.InternalNotificationRequest(
-                null, // recipientId - to be fetched from comment
+                recipientId,
                 replyerId,
                 NotificationType.REPLY_CREATED,
                 title,
@@ -313,11 +326,17 @@ public class NotificationServiceImpl implements NotificationService {
     public void notifyReplyOnReply(Long replyId, Long replyerId, String replierName) {
         log.info("[{}] Notifying reply owner about nested reply on reply ID: {}", getTraceId(), replyId);
 
+        Long recipientId = replyRepository.findById(replyId)
+                .map(reply -> reply.getUser().getId())
+                .orElse(null);
+
+        if (recipientId == null) return;
+
         String title = replierName + " replied to your reply";
         String message = "Check out the new reply";
 
         createNotification(new NotificationRequest.InternalNotificationRequest(
-                null, // recipientId - to be fetched from reply
+                recipientId,
                 replyerId,
                 NotificationType.REPLY_TO_REPLY,
                 title,
@@ -334,11 +353,17 @@ public class NotificationServiceImpl implements NotificationService {
     public void notifyPostLiked(Long postId, Long likerId, String likerName) {
         log.info("[{}] Notifying post owner about like on post ID: {}", getTraceId(), postId);
 
+        Long recipientId = postRepository.findById(postId)
+                .map(post -> post.getUser().getId())
+                .orElse(null);
+
+        if (recipientId == null) return;
+
         String title = likerName + " liked your post";
         String message = "Your post is getting attention";
 
         createNotification(new NotificationRequest.InternalNotificationRequest(
-                null, // recipientId - to be fetched from post
+                recipientId,
                 likerId,
                 NotificationType.POST_LIKED,
                 title,
@@ -355,7 +380,7 @@ public class NotificationServiceImpl implements NotificationService {
     public void notifyReportSubmitted(Long reportId, String reporterName, String targetType, Long targetId) {
         log.info("[{}] Notifying admins about report ID: {}", getTraceId(), reportId);
 
-        // Get all admin users
+
         List<User> admins = userRepository.findByRole(Role.ADMIN);
 
         String title = reporterName + " submitted a report";
@@ -426,29 +451,24 @@ public class NotificationServiceImpl implements NotificationService {
         log.info("[{}] Sending pending FCM push notifications", getTraceId());
 
         List<Notification> pendingNotifications = notificationRepository.findNotificationsPendingPush();
-        log.info("[{}] Found {} notifications pending push", getTraceId(), pendingNotifications.size());
 
         for (Notification notification : pendingNotifications) {
             try {
-                if (fcmService.isFcmAvailable() && notification.getFcmToken() != null) {
-                    boolean sent = fcmService.sendPushNotification(
-                            notification.getFcmToken(),
-                            notification.getTitle(),
-                            notification.getMessage(),
-                            null
-                    );
+                NotificationResponse.NotificationDto dto = NotificationResponse.NotificationDto.fromEntity(notification);
 
-                    if (sent) {
-                        notification.setPushSent(true);
-                        notificationRepository.save(notification);
-                        log.info("[{}] Push notification sent for ID: {}", getTraceId(), notification.getId());
-                    }
+                boolean sent = fcmService.sendNotificationAsPush(dto);
+
+                if (sent) {
+                    notification.setPushSent(true);
+                    notificationRepository.save(notification);
+                    log.info("[{}] Push notification sent for ID: {}", getTraceId(), notification.getId());
                 }
             } catch (Exception e) {
                 log.error("[{}] Error sending push notification for ID: {}", getTraceId(), notification.getId(), e);
             }
         }
     }
+
 
     /**
      * Send notification via WebSocket (STOMP)
@@ -463,6 +483,29 @@ public class NotificationServiceImpl implements NotificationService {
             log.info("[{}] WebSocket notification sent for user ID: {}", getTraceId(), notification.getRecipient().getId());
         } catch (Exception e) {
             log.warn("[{}] Failed to send WebSocket notification: {}", getTraceId(), e.getMessage());
+        }
+    }
+
+    @Override
+    @Transactional
+    public int deleteOldNotifications(LocalDateTime beforeDate) {
+        log.info("[{}] Deleting notifications created before: {}", getTraceId(), beforeDate);
+
+        try {
+            long countBefore = notificationRepository.count();
+
+            int deletedCount = notificationRepository.deleteOldNotifications(null, beforeDate);
+
+            long countAfter = notificationRepository.count();
+
+            log.info("[{}] Successfully deleted {} old notifications", getTraceId(), deletedCount);
+            log.info("[{}] Before: {}, After: {}", getTraceId(), countBefore, countAfter);
+
+            return deletedCount;
+
+        } catch (Exception e) {
+            log.error("[{}] Error deleting old notifications: {}", getTraceId(), e.getMessage(), e);
+            throw new RuntimeException("Failed to delete old notifications", e);
         }
     }
 

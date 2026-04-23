@@ -106,4 +106,7 @@ public class User extends BaseEntity implements UserDetails {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Notification> sentNotifications = new ArrayList<>();
+
+    @Column(name = "fcm_token")
+    private String fcmToken;
 }

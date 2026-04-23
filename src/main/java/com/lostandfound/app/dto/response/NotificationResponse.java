@@ -19,6 +19,7 @@ public class NotificationResponse {
             NotificationType type,
             NotificationStatus status,
             String title,
+            String fcmToken,
             String message,
             Long postId,
             Long commentId,
@@ -38,6 +39,7 @@ public class NotificationResponse {
                     .type(notification.getType())
                     .status(notification.getStatus())
                     .title(notification.getTitle())
+                    .fcmToken(notification.getFcmToken())
                     .message(notification.getMessage())
                     .postId(notification.getPostId())
                     .commentId(notification.getCommentId())
