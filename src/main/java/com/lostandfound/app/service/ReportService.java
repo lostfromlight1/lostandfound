@@ -24,4 +24,6 @@ public interface ReportService {
     public void resolveReport(Long reportId, ReportActionRequest request);
 
     public void rejectReport(Long reportId, ReportActionRequest request);
+
+    void restoreTarget(Long reportId);
 }

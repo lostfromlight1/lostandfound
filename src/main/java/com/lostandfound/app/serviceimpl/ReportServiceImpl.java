@@ -12,6 +12,7 @@ import com.lostandfound.app.repository.UserRepository;
 import com.lostandfound.app.security.CustomUserDetails;
 import com.lostandfound.app.service.NotificationService;
 import com.lostandfound.app.service.ReportService;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -30,24 +31,23 @@ import static com.lostandfound.app.util.ReportSpecification.hasTargetType;
 @RequiredArgsConstructor
 public class ReportServiceImpl implements ReportService {
 
-
     private final UserRepository userRepository;
     private final PostRepository postRepository;
     private final ReportRepository reportRepository;
     private final CommentRepository commentRepository;
     private final NotificationService notificationService;
 
+    // FIX: Inject EntityManager so we can bypass @SQLRestriction when restoring data
+    private final EntityManager entityManager;
 
     @Override
     @Transactional
     public void report(CreateReportRequest request, CustomUserDetails userDetails) {
-
         Long userId = userDetails.getId();
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // 🚫 1. Prevent duplicate report
         boolean alreadyReported = reportRepository
                 .existsByReportedByIdAndTargetTypeAndTargetId(
                         userId,
@@ -59,7 +59,6 @@ public class ReportServiceImpl implements ReportService {
             throw new RuntimeException("You already reported this");
         }
 
-        // 🔍 2. Validate target exists
         switch (request.targetType()) {
             case POST -> postRepository.findById(request.targetId())
                     .orElseThrow(() -> new RuntimeException("Post not found"));
@@ -71,7 +70,6 @@ public class ReportServiceImpl implements ReportService {
                     .orElseThrow(() -> new RuntimeException("User not found"));
         }
 
-        // 🧱 3. Save report
         Report report = new Report();
         report.setReportedBy(user);
         report.setTargetType(request.targetType());
@@ -91,7 +89,6 @@ public class ReportServiceImpl implements ReportService {
 
         // 🔥 4. AUTO ACTION (only for POST)
         if (request.targetType() == ReportTargetType.POST) {
-
             long count = reportRepository.countByTargetTypeAndTargetId(
                     ReportTargetType.POST,
                     request.targetId()
@@ -99,8 +96,7 @@ public class ReportServiceImpl implements ReportService {
 
             if (count >= 5) {
                 Post post = postRepository.findById(request.targetId()).orElseThrow();
-
-                post.setStatus(PostStatus.HIDDEN); // 👈 you need this enum
+                post.setStatus(PostStatus.HIDDEN);
                 postRepository.save(post);
             }
         }
@@ -117,9 +113,10 @@ public class ReportServiceImpl implements ReportService {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
-        Specification<Report> spec = Specification
-                .where(hasStatus(status))
-                .and(hasTargetType(targetType));
+        Specification<Report> spec = Specification.allOf(
+                hasStatus(status),
+                hasTargetType(targetType)
+        );
 
         Page<Report> reportPage = reportRepository.findAll(spec, pageable);
 
@@ -148,9 +145,7 @@ public class ReportServiceImpl implements ReportService {
             throw new RuntimeException("Report already handled");
         }
 
-
         switch (report.getTargetType()) {
-
             case POST -> {
                 Post post = postRepository.findById(report.getTargetId())
                         .orElseThrow(() -> new RuntimeException("Post not found"));
@@ -158,19 +153,19 @@ public class ReportServiceImpl implements ReportService {
                 post.setStatus(PostStatus.HIDDEN);
                 postRepository.save(post);
             }
-
             case COMMENT -> {
                 Comment comment = commentRepository.findById(report.getTargetId())
                         .orElseThrow(() -> new RuntimeException("Comment not found"));
 
                 comment.softDelete();
+                commentRepository.save(comment);
             }
-
             case USER -> {
                 User user = userRepository.findById(report.getTargetId())
                         .orElseThrow(() -> new RuntimeException("User not found"));
 
-                user.setActive(false); // 🔥 BAN USER
+                user.setActive(false);
+                userRepository.save(user);
             }
         }
 
@@ -186,7 +181,7 @@ public class ReportServiceImpl implements ReportService {
         );
     }
 
-
+    @Override
     @Transactional
     public void rejectReport(Long reportId, ReportActionRequest request) {
 
@@ -209,6 +204,54 @@ public class ReportServiceImpl implements ReportService {
         );
     }
 
+    // --- NEW RESTORE METHOD ---
+    @Override
+    @Transactional
+    public void restoreTarget(Long reportId) {
+        Report report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new RuntimeException("Report not found"));
+
+        switch (report.getTargetType()) {
+            case POST -> {
+                // Use EntityManager directly to bypass the @SQLRestriction("is_active = true")
+                Post post = entityManager.find(Post.class, report.getTargetId());
+                if (post == null) throw new RuntimeException("Post not found in database");
+
+                post.setStatus(PostStatus.OPEN);
+                // Also reset active flag just in case it was soft deleted
+                post.setActive(true);
+                post.setDeletedAt(null);
+
+                entityManager.merge(post);
+            }
+            case COMMENT -> {
+                // Use EntityManager directly to bypass the @SQLRestriction("is_active = true")
+                Comment comment = entityManager.find(Comment.class, report.getTargetId());
+                if (comment == null) throw new RuntimeException("Comment not found in database");
+
+                comment.setActive(true);
+                comment.setDeletedAt(null);
+
+                entityManager.merge(comment);
+            }
+            case USER -> {
+                // Use EntityManager directly to bypass the @SQLRestriction("is_active = true")
+                User user = entityManager.find(User.class, report.getTargetId());
+                if (user == null) throw new RuntimeException("User not found in database");
+
+                user.setActive(true);
+                user.setDeletedAt(null);
+                user.setIsLocked(false);
+
+                entityManager.merge(user);
+            }
+        }
+
+        // Set the report to REJECTED (meaning "we looked at it and decided the content is safe")
+        report.setStatus(ReportStatus.REJECTED);
+        report.setAdminNote("Restored by admin");
+        reportRepository.save(report);
+    }
 
     private ReportResponse.ReportDto mapToDto(Report report) {
         return new ReportResponse.ReportDto(
