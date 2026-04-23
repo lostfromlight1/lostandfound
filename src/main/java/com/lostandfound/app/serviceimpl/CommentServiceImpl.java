@@ -19,7 +19,6 @@ import com.lostandfound.app.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -111,7 +110,7 @@ public class CommentServiceImpl implements CommentService {
         if (!comment.getUser().getId().equals(currentUser.getId())) {
             log.warn("[{}] User ID: {} attempted to update comment ID: {} owned by user ID: {}",
                     getTraceId(), currentUser.getId(), commentId, comment.getUser().getId());
-            throw new AccessDeniedException("You can only update your own comments");
+            throw new AppException(ErrorCode.ACCESS_DENIED, "You can only update your own comments");
         }
 
         comment.setContent(request.content());
@@ -157,7 +156,7 @@ public class CommentServiceImpl implements CommentService {
         if (!isAuthor && !isAdmin) {
             log.warn("[{}] User ID: {} (Admin: {}) attempted to delete comment ID: {} owned by user ID: {}",
                     getTraceId(), currentUser.getId(), isAdmin, commentId, comment.getUser().getId());
-            throw new AccessDeniedException("You can only delete your own comments");
+            throw new AppException(ErrorCode.ACCESS_DENIED, "You can only delete your own comments");
         }
 
         comment.softDelete();

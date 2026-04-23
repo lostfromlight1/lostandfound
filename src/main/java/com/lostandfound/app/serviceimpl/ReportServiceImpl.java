@@ -4,6 +4,8 @@ import com.lostandfound.app.dto.request.CreateReportRequest;
 import com.lostandfound.app.dto.request.ReportActionRequest;
 import com.lostandfound.app.dto.response.PageResponse;
 import com.lostandfound.app.dto.response.ReportResponse;
+import com.lostandfound.app.exception.AppException;
+import com.lostandfound.app.exception.ErrorCode;
 import com.lostandfound.app.model.*;
 import com.lostandfound.app.repository.CommentRepository;
 import com.lostandfound.app.repository.PostRepository;
@@ -45,7 +47,7 @@ public class ReportServiceImpl implements ReportService {
         Long userId = userDetails.getId();
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "User not found"));
 
         boolean alreadyReported = reportRepository
                 .existsByReportedByIdAndTargetTypeAndTargetId(
@@ -55,18 +57,18 @@ public class ReportServiceImpl implements ReportService {
                 );
 
         if (alreadyReported) {
-            throw new RuntimeException("You already reported this");
+            throw new AppException(ErrorCode.BUSINESS_ERROR, "You have already reported this item");
         }
 
         switch (request.targetType()) {
             case POST -> postRepository.findById(request.targetId())
-                    .orElseThrow(() -> new RuntimeException("Post not found"));
+                    .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Post not found"));
 
             case COMMENT -> commentRepository.findById(request.targetId())
-                    .orElseThrow(() -> new RuntimeException("Comment not found"));
+                    .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Comment not found"));
 
             case USER -> userRepository.findById(request.targetId())
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "User not found"));
         }
 
         Report report = new Report();
@@ -79,6 +81,7 @@ public class ReportServiceImpl implements ReportService {
 
         reportRepository.save(report);
 
+        // Notify Admins
         notificationService.notifyReportSubmitted(
                 report.getId(),
                 user.getDisplayName(),
@@ -92,11 +95,11 @@ public class ReportServiceImpl implements ReportService {
                     request.targetId()
             );
 
+            // Auto-hide post if reported 5 or more times
             if (count >= 5) {
                 Post post = postRepository.findById(request.targetId()).orElseThrow();
                 post.setStatus(PostStatus.HIDDEN);
                 postRepository.save(post);
-
             }
         }
     }
@@ -138,30 +141,30 @@ public class ReportServiceImpl implements ReportService {
     public void resolveReport(Long reportId, ReportActionRequest request) {
 
         Report report = reportRepository.findById(reportId)
-                .orElseThrow(() -> new RuntimeException("Report not found"));
+                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Report not found"));
 
         if (report.getStatus() != ReportStatus.PENDING) {
-            throw new RuntimeException("Report already handled");
+            throw new AppException(ErrorCode.BUSINESS_ERROR, "This report has already been processed");
         }
 
         switch (report.getTargetType()) {
             case POST -> {
                 Post post = postRepository.findById(report.getTargetId())
-                        .orElseThrow(() -> new RuntimeException("Post not found"));
+                        .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Post not found"));
 
                 post.setStatus(PostStatus.HIDDEN);
                 postRepository.save(post);
             }
             case COMMENT -> {
                 Comment comment = commentRepository.findById(report.getTargetId())
-                        .orElseThrow(() -> new RuntimeException("Comment not found"));
+                        .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Comment not found"));
 
                 comment.softDelete();
                 commentRepository.save(comment);
             }
             case USER -> {
                 User user = userRepository.findById(report.getTargetId())
-                        .orElseThrow(() -> new RuntimeException("User not found"));
+                        .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "User not found"));
 
                 user.setActive(false);
                 userRepository.save(user);
@@ -173,6 +176,7 @@ public class ReportServiceImpl implements ReportService {
 
         reportRepository.save(report);
 
+        // Notify the user who submitted the report
         notificationService.notifyReportResolved(
                 report.getId(),
                 report.getReportedBy().getId(),
@@ -185,10 +189,10 @@ public class ReportServiceImpl implements ReportService {
     public void rejectReport(Long reportId, ReportActionRequest request) {
 
         Report report = reportRepository.findById(reportId)
-                .orElseThrow(() -> new RuntimeException("Report not found"));
+                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Report not found"));
 
         if (report.getStatus() != ReportStatus.PENDING) {
-            throw new RuntimeException("Report already handled");
+            throw new AppException(ErrorCode.BUSINESS_ERROR, "This report has already been processed");
         }
 
         report.setStatus(ReportStatus.REJECTED);
@@ -196,6 +200,7 @@ public class ReportServiceImpl implements ReportService {
 
         reportRepository.save(report);
 
+        // Notify the user who submitted the report
         notificationService.notifyReportRejected(
                 report.getId(),
                 report.getReportedBy().getId(),
@@ -207,12 +212,12 @@ public class ReportServiceImpl implements ReportService {
     @Transactional
     public void restoreTarget(Long reportId) {
         Report report = reportRepository.findById(reportId)
-                .orElseThrow(() -> new RuntimeException("Report not found"));
+                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Report not found"));
 
         switch (report.getTargetType()) {
             case POST -> {
                 Post post = entityManager.find(Post.class, report.getTargetId());
-                if (post == null) throw new RuntimeException("Post not found in database");
+                if (post == null) throw new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Post not found in database");
 
                 post.setStatus(PostStatus.OPEN);
                 post.setActive(true);
@@ -222,7 +227,7 @@ public class ReportServiceImpl implements ReportService {
             }
             case COMMENT -> {
                 Comment comment = entityManager.find(Comment.class, report.getTargetId());
-                if (comment == null) throw new RuntimeException("Comment not found in database");
+                if (comment == null) throw new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Comment not found in database");
 
                 comment.setActive(true);
                 comment.setDeletedAt(null);
@@ -231,7 +236,7 @@ public class ReportServiceImpl implements ReportService {
             }
             case USER -> {
                 User user = entityManager.find(User.class, report.getTargetId());
-                if (user == null) throw new RuntimeException("User not found in database");
+                if (user == null) throw new AppException(ErrorCode.RESOURCE_NOT_FOUND, "User not found in database");
 
                 user.setActive(true);
                 user.setDeletedAt(null);
@@ -245,6 +250,7 @@ public class ReportServiceImpl implements ReportService {
         report.setAdminNote("Restored by admin");
         reportRepository.save(report);
 
+        // Notify the user who submitted the report that their report was rejected (since the item was restored)
         notificationService.notifyReportRejected(
                 report.getId(),
                 report.getReportedBy().getId(),

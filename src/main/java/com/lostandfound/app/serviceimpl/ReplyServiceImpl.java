@@ -16,7 +16,6 @@ import com.lostandfound.app.service.ReplyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -148,7 +147,7 @@ public class ReplyServiceImpl implements ReplyService {
         if (!reply.getUser().getId().equals(currentUser.getId())) {
             log.warn("[{}] User ID: {} attempted to update reply ID: {} owned by user ID: {}",
                     getTraceId(), currentUser.getId(), replyId, reply.getUser().getId());
-            throw new AccessDeniedException("You can only update your own replies");
+            throw new AppException(ErrorCode.ACCESS_DENIED, "You can only update your own replies");
         }
 
         reply.setContent(request.content());
@@ -174,7 +173,7 @@ public class ReplyServiceImpl implements ReplyService {
         if (!isAuthor && !isAdmin) {
             log.warn("[{}] User ID: {} (Admin: {}) attempted to delete reply ID: {} owned by user ID: {}",
                     getTraceId(), currentUser.getId(), isAdmin, replyId, reply.getUser().getId());
-            throw new AccessDeniedException("You can only delete your own replies");
+            throw new AppException(ErrorCode.ACCESS_DENIED, "You can only delete your own replies");
         }
 
         reply.softDelete();
