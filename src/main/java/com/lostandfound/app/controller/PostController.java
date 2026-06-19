@@ -38,7 +38,6 @@ public class PostController {
     public ResponseEntity<BaseResponse<PostResponse.PostDto>> createPost(
             @Valid @RequestBody PostRequest.CreatePostRequest request,
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails) {
-
         log.info("REST request to create post by user ID: {}", userDetails.getId());
         PostResponse.PostDto response = postService.createPost(request, userDetails);
         return BaseResponse.created("Post created successfully", response);
@@ -51,8 +50,7 @@ public class PostController {
     public ResponseEntity<BaseResponse<PostResponse.PostDto>> updatePost(
             @PathVariable Long id,
             @Valid @RequestBody PostRequest.UpdatePostRequest request,
-            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails) { // Fixed: Use @AuthenticationPrincipal
-
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails) {
         log.info("REST request to update post ID: {} by user ID: {}", id, userDetails.getId());
         PostResponse.PostDto response = postService.updatePost(id, request, userDetails);
         return BaseResponse.success("Post updated successfully", response);
@@ -65,6 +63,7 @@ public class PostController {
     public ResponseEntity<BaseResponse<PageResponse<PostResponse.PostDto>>> getAll(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
+            @RequestParam(defaultValue = "LATEST") String sortBy,
             @RequestParam(required = false) PostType type,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) MyanmarCity city,
@@ -72,11 +71,11 @@ public class PostController {
             @RequestParam(required = false) LocalDate startDate,
             @RequestParam(required = false) LocalDate endDate,
             @CurrentUser CustomUserDetails userDetails
-
-            ) {
-
-        log.info("REST request to fetch posts list. Page: {}, Size: {}", page, size);
-        PageResponse<PostResponse.PostDto> response = postService.getAll(page, size, type, categoryId, city,locationDetails,startDate,endDate,userDetails);
+    ) {
+        log.info("REST request to fetch posts list. Page: {}, Size: {}, SortBy: {}", page, size, sortBy);
+        PageResponse<PostResponse.PostDto> response = postService.getAll(
+                page, size, sortBy, type, categoryId, city, locationDetails, startDate, endDate, userDetails
+        );
         return BaseResponse.success("Posts fetched successfully", response);
     }
 
@@ -86,8 +85,7 @@ public class PostController {
     @Operation(summary = "Delete Post", description = "Soft deletes a post. Only the post owner can perform this action.")
     public ResponseEntity<BaseResponse<Void>> deletePost(
             @PathVariable Long id,
-            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails) { // Fixed: Use @AuthenticationPrincipal
-
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails) {
         log.info("REST request to delete post ID: {} by user ID: {}", id, userDetails.getId());
         postService.deletePost(id, userDetails);
         return BaseResponse.success("Post deleted successfully");
@@ -100,7 +98,6 @@ public class PostController {
             @PathVariable Long userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size) {
-
         log.info("REST request to fetch posts for user ID: {}. Page: {}, Size: {}", userId, page, size);
         PageResponse<PostResponse.PostDto> response = postService.getUserPosts(userId, page, size);
         return BaseResponse.success("User's posts fetched successfully", response);
@@ -112,9 +109,37 @@ public class PostController {
     public ResponseEntity<BaseResponse<PostResponse.PostDto>> getPostById(
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser CustomUserDetails userDetails) {
-
         log.info("REST request to fetch post ID: {}", id);
         PostResponse.PostDto response = postService.getPostById(id, userDetails);
         return BaseResponse.success("Post fetched successfully", response);
+    }
+
+    // -------------------------------------------------------------------------
+    // NEW BOOKMARK ENDPOINTS
+    // -------------------------------------------------------------------------
+
+    @PostMapping("/{id}/bookmark")
+    @CheckSecurity.Authenticated.isRequired
+    @ApiId("PST-007")
+    @Operation(summary = "Toggle Bookmark", description = "Adds or removes a post from the current user's bookmarks.")
+    public ResponseEntity<BaseResponse<Void>> toggleBookmark(
+            @PathVariable Long id,
+            @Parameter(hidden = true) @CurrentUser CustomUserDetails userDetails) {
+        log.info("REST request to toggle bookmark on post ID: {} by user ID: {}", id, userDetails.getId());
+        postService.toggleBookmark(id, userDetails);
+        return BaseResponse.success("Bookmark toggled successfully");
+    }
+
+    @GetMapping("/bookmarks")
+    @CheckSecurity.Authenticated.isRequired
+    @ApiId("PST-008")
+    @Operation(summary = "Get Bookmarked Posts", description = "Fetches a paginated list of posts bookmarked by the authenticated user.")
+    public ResponseEntity<BaseResponse<PageResponse<PostResponse.PostDto>>> getBookmarks(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size,
+            @Parameter(hidden = true) @CurrentUser CustomUserDetails userDetails) {
+        log.info("REST request to fetch bookmarked posts for user ID: {}", userDetails.getId());
+        PageResponse<PostResponse.PostDto> response = postService.getBookmarkedPosts(userDetails, page, size);
+        return BaseResponse.success("Bookmarked posts fetched successfully", response);
     }
 }

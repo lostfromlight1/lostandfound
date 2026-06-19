@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Comparator;
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -36,33 +37,29 @@ public class PostServiceImpl implements PostService {
     private final CategoryRepository categoryRepository;
     private final PostRepository postRepository;
     private final PostLikeRepository postLikeRepository;
+
     private final CommentRepository commentRepository;
+
+    private final PostBookmarkRepository postBookmarkRepository; // <--- INJECTED
+
 
     @Override
     @Transactional
     public PostResponse.PostDto createPost(PostRequest.CreatePostRequest request,
                                            CustomUserDetails userDetailsService) {
-
         Long userId = userDetailsService.getId();
-        log.info("[{}] Attempting to create post for user ID: {}", getTraceId(), userId);
-
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "User not found"));
-
         Category category = categoryRepository.findById(request.categoryId())
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Category not found"));
 
         try {
             Post post = buildNewPost(request, user, category);
             Post savedPost = postRepository.save(post);
-            log.info("[{}] Successfully created post ID: {}", getTraceId(), savedPost.getId());
             return mapToDto(savedPost, userId);
-
         } catch (IllegalArgumentException e) {
-            log.error("[{}] Invalid enum mapping: {}", getTraceId(), e.getMessage());
             throw new AppException(ErrorCode.VALIDATION_ERROR, "Invalid location or post type provided");
         } catch (Exception e) {
-            log.error("[{}] Unexpected error: {}", getTraceId(), e.getMessage());
             throw new AppException(ErrorCode.INTERNAL_ERROR, "An error occurred while creating the post");
         }
     }
@@ -71,7 +68,6 @@ public class PostServiceImpl implements PostService {
     @Override
     public PostResponse.PostDto updatePost(Long id, PostRequest.UpdatePostRequest request,
                                            CustomUserDetails userDetails) {
-
         Long userId = userDetails.getId();
         Post post = postRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Post not found"));
@@ -95,7 +91,6 @@ public class PostServiceImpl implements PostService {
         post.setLostFoundDate(request.lostFoundDate());
         post.setCategory(category);
 
-        // --- IMAGE MAPPING LOGIC ---
         if (post.getImages() == null) {
             post.setImages(new ArrayList<>());
         } else {
@@ -105,17 +100,14 @@ public class PostServiceImpl implements PostService {
         if (request.images() != null && !request.images().isEmpty()) {
             List<PostImage> newImages = request.images().stream().map(imgReq -> {
                 PostImage img = new PostImage();
-                // Map from Record DTO -> Entity
                 img.setImageUrl(imgReq.url());
                 img.setPublicId(imgReq.publicId());
                 img.setSortOrder(imgReq.sortOrder() != null ? imgReq.sortOrder() : 0);
                 img.setPost(post);
                 return img;
             }).toList();
-
             post.getImages().addAll(newImages);
         }
-        // ---------------------------
 
         Post updatedPost = postRepository.save(post);
         return mapToDto(updatedPost, userId);
@@ -134,12 +126,18 @@ public class PostServiceImpl implements PostService {
     @Transactional(readOnly = true)
     @Override
     public PageResponse<PostResponse.PostDto> getAll(
-            int page, int size, PostType type, Long categoryId,
+            int page, int size, String sortBy, PostType type, Long categoryId,
             MyanmarCity city, String locationDetails, LocalDate startDate, LocalDate endDate,
             CustomUserDetails userDetails
     ) {
-        log.info("[{}] Fetching posts. Page: {}, Size: {}", getTraceId(), page, size);
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Sort sort;
+        if ("TOP".equalsIgnoreCase(sortBy)) {
+            sort = Sort.by(Sort.Direction.DESC, "likeCount").and(Sort.by(Sort.Direction.DESC, "createdAt"));
+        } else {
+            sort = Sort.by(Sort.Direction.DESC, "createdAt");
+        }
+
+        Pageable pageable = PageRequest.of(page, size, sort);
 
         Specification<Post> spec = Specification.allOf(
                 PostSpecification.hasType(type),
@@ -150,7 +148,6 @@ public class PostServiceImpl implements PostService {
         );
 
         Page<Post> postPage = postRepository.findAll(spec, pageable);
-
         Long currentUserId = (userDetails != null) ? userDetails.getId() : null;
 
         List<PostResponse.PostDto> content = postPage.getContent()
@@ -191,6 +188,49 @@ public class PostServiceImpl implements PostService {
         postRepository.save(post);
     }
 
+    // -------------------------------------------------------------------------
+    // NEW BOOKMARK METHODS
+    // -------------------------------------------------------------------------
+
+    @Transactional
+    @Override
+    public void toggleBookmark(Long postId, CustomUserDetails userDetails) {
+        Long userId = userDetails.getId();
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Post not found"));
+
+        Optional<PostBookmark> existingBookmark = postBookmarkRepository.findByUserIdAndPostId(userId, postId);
+
+        if (existingBookmark.isPresent()) {
+            postBookmarkRepository.delete(existingBookmark.get());
+        } else {
+            User user = userRepository.getReferenceById(userId);
+            PostBookmark newBookmark = PostBookmark.builder()
+                    .user(user)
+                    .post(post)
+                    .build();
+            postBookmarkRepository.save(newBookmark);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public PageResponse<PostResponse.PostDto> getBookmarkedPosts(CustomUserDetails userDetails, int page, int size) {
+        Long userId = userDetails.getId();
+        Pageable pageable = PageRequest.of(page, size);
+
+        Page<Post> postPage = postBookmarkRepository.findBookmarkedPostsByUserId(userId, pageable);
+
+        List<PostResponse.PostDto> content = postPage.getContent()
+                .stream()
+                .map(post -> mapToDto(post, userId))
+                .toList();
+
+        return new PageResponse<>(content, postPage.getNumber(), postPage.getSize(), postPage.getTotalElements(), postPage.getTotalPages());
+    }
+
+    // -------------------------------------------------------------------------
+
     private Post buildNewPost(PostRequest.CreatePostRequest request, User user, Category category) {
         Post post = new Post();
         post.setTitle(request.title());
@@ -207,34 +247,38 @@ public class PostServiceImpl implements PostService {
         post.setUser(user);
         post.setCategory(category);
 
-        // --- IMAGE MAPPING LOGIC ---
         post.setImages(new ArrayList<>());
 
         if (request.images() != null && !request.images().isEmpty()) {
             List<PostImage> newImages = request.images().stream().map(imgReq -> {
                 PostImage img = new PostImage();
-                // Map from Record DTO -> Entity
                 img.setImageUrl(imgReq.url());
                 img.setPublicId(imgReq.publicId());
                 img.setSortOrder(imgReq.sortOrder() != null ? imgReq.sortOrder() : 0);
                 img.setPost(post);
                 return img;
             }).toList();
-
             post.getImages().addAll(newImages);
         }
-        // ---------------------------
 
         return post;
     }
 
     private PostResponse.PostDto mapToDto(Post post, Long currentUserId) {
+
         long likeCount = postLikeRepository.countByPostId(post.getId());
 
 
         long commentCount = commentRepository.countByPostIdAndDeletedAtIsNull(post.getId());
 
+        long likes = post.getLikeCount() != null ? post.getLikeCount() : 0L;
+        long comments = post.getCommentCount() != null ? post.getCommentCount() : 0L;
+
+
         boolean liked = (currentUserId != null) && postLikeRepository.existsByUserIdAndPostId(currentUserId, post.getId());
+
+        // <--- NEW BOOKMARK FLAG
+        boolean bookmarked = (currentUserId != null) && postBookmarkRepository.existsByUserIdAndPostId(currentUserId, post.getId());
 
         List<PostResponse.ImageDto> imageDtos = post.getImages().stream()
                 .sorted(Comparator.comparingInt(PostImage::getSortOrder))
@@ -266,9 +310,14 @@ public class PostServiceImpl implements PostService {
                         post.getCategory().getName()
                 ),
                 imageDtos,
+
                 likeCount,
                 liked,
-                commentCount
+                commentCount,
+                bookmarked
+
+
+
 
         );
     }

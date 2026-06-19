@@ -211,11 +211,15 @@ public class NotificationServiceImpl implements NotificationService {
             User recipient = userRepository.findById(request.recipientId())
                     .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Recipient not found"));
 
-            User user = userRepository.findById(request.userId())
-                    .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "User not found"));
+            User user;
+            if (request.userId() != null && request.userId() == 0L) {
+                user = recipient;
+            } else {
+                user = userRepository.findById(request.userId())
+                        .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "User not found"));
+            }
 
-            // Prevent self-notifications
-            if (recipient.getId().equals(user.getId())) {
+            if (recipient.getId().equals(user.getId()) && request.userId() != 0L) {
                 log.info("[{}] Skipping self-notification for user ID: {}", getTraceId(), user.getId());
                 return;
             }
@@ -223,7 +227,7 @@ public class NotificationServiceImpl implements NotificationService {
             // Check for duplicate unread notifications
             boolean exists = notificationRepository.existsByRecipientAndUserAndTypeAndPost(
                     request.recipientId(),
-                    request.userId(),
+                    user.getId(),
                     request.type(),
                     request.postId()
             );

@@ -20,18 +20,18 @@ public class EmailServiceImpl extends BaseService implements EmailService {
     private String fromEmail;
 
     @Override
-    public void sendPasswordResetEmail(String to, String resetLink) {
+    public void sendPasswordResetEmail(String to, String resetCode) {
         log.info("[{}] Preparing password reset email for: {}", getTraceId(), to);
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromEmail);
         message.setTo(to);
-        message.setSubject("Password Reset Request - Lost & Found");
+        message.setSubject("Password Reset Code - Back2U");
         message.setText("Hello,\n\n" +
-                "You have requested to reset your password. Click the link below to change it:\n\n" +
-                resetLink + "\n\n" +
-                "This link will expire in 15 minutes. If you did not request this, please ignore this email.\n\n" +
-                "Thanks,\nThe Lost & Found Team");
+                "You requested to reset your password. Please enter the following 6-character code to reset it:\n\n" +
+                "   [ " + resetCode + " ]   \n\n" +
+                "This code will expire in 15 minutes. If you did not request this, please ignore this email and your password will remain unchanged.\n\n" +
+                "Thanks,\nThe Back2U Team");
 
         sendEmail(message, to, "Password reset");
     }
@@ -43,12 +43,12 @@ public class EmailServiceImpl extends BaseService implements EmailService {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromEmail);
         message.setTo(to);
-        message.setSubject("Verify Your Email - Lost & Found");
+        message.setSubject("Verify Your Email - Back2U");
         message.setText("Hello,\n\n" +
-                "Welcome to Lost & Found! Please verify your email address by entering the following 6-character code on the verification page:\n\n" +
+                "Welcome to Back2U! Please verify your email address by entering the following 6-character code on the verification page:\n\n" +
                 "   [ " + verificationCode + " ]   \n\n" +
                 "This code will expire in 24 hours.\n\n" +
-                "Thanks,\nThe Lost & Found Team");
+                "Thanks,\nThe Back2U Team");
 
         sendEmail(message, to, "Verification");
     }

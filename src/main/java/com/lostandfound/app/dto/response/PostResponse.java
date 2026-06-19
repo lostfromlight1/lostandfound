@@ -3,53 +3,40 @@ package com.lostandfound.app.dto.response;
 import com.lostandfound.app.model.MyanmarCity;
 import com.lostandfound.app.model.PostStatus;
 import com.lostandfound.app.model.PostType;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
 public class PostResponse {
 
-    public record PostDto(
-            Long id,
-            String title,
-            String description,
-            PostType type,
-            PostStatus status,
-            MyanmarCity city,
-            String locationDetails,
-            Double latitude,
-            Double longitude,
-            LocalDate lostFoundDate,
-            LocalDateTime createdAt,
-            String contactInfo,
-            java.math.BigDecimal reward,
+  public record PostDto(
+      Long id,
+      String title,
+      String description,
+      PostType type,
+      PostStatus status,
+      MyanmarCity city,
+      String locationDetails,
+      Double latitude,
+      Double longitude,
+      LocalDate lostFoundDate,
+      LocalDateTime createdAt,
+      String contactInfo,
+      java.math.BigDecimal reward,
+      UserSummary user,
+      CategoryDto category,
+      List<ImageDto> images,
+      Long LikeCount,
+      boolean liked,
+      Long commentCount,
+      boolean bookmarked // <--- ADDED THIS
+      ) {}
 
-            UserSummary user,
-            CategoryDto category,
+  public record UserSummary(Long id, String displayName, String avatarUrl, String email) {}
 
-            List<ImageDto> images,
+  public record CategoryDto(Long id, String name) {}
 
-            Long LikeCount,
-            boolean liked,
-            Long commentCount
-    ) {}
-
-    public record UserSummary(
-            Long id,
-            String displayName,
-            String avatarUrl,
-            String email
-    ) {}
-
-    public record CategoryDto(
-            Long id,
-            String name
-    ) {}
-
-    public record ImageDto(
-            Long id,
-            String url,
-            Integer sortOrder
-    ) {}
+  public record ImageDto(Long id, String url, Integer sortOrder) {}
 }
+
+
