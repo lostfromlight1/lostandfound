@@ -6,10 +6,7 @@ import com.lostandfound.app.dto.response.PostResponse;
 import com.lostandfound.app.exception.AppException;
 import com.lostandfound.app.exception.ErrorCode;
 import com.lostandfound.app.model.*;
-import com.lostandfound.app.repository.CategoryRepository;
-import com.lostandfound.app.repository.PostLikeRepository;
-import com.lostandfound.app.repository.PostRepository;
-import com.lostandfound.app.repository.UserRepository;
+import com.lostandfound.app.repository.*;
 import com.lostandfound.app.security.CustomUserDetails;
 import com.lostandfound.app.service.PostService;
 import com.lostandfound.app.util.PostSpecification;
@@ -39,6 +36,7 @@ public class PostServiceImpl implements PostService {
     private final CategoryRepository categoryRepository;
     private final PostRepository postRepository;
     private final PostLikeRepository postLikeRepository;
+    private final CommentRepository commentRepository;
 
     @Override
     @Transactional
@@ -232,6 +230,10 @@ public class PostServiceImpl implements PostService {
 
     private PostResponse.PostDto mapToDto(Post post, Long currentUserId) {
         long likeCount = postLikeRepository.countByPostId(post.getId());
+
+
+        long commentCount = commentRepository.countByPostIdAndDeletedAtIsNull(post.getId());
+
         boolean liked = (currentUserId != null) && postLikeRepository.existsByUserIdAndPostId(currentUserId, post.getId());
 
         List<PostResponse.ImageDto> imageDtos = post.getImages().stream()
@@ -265,7 +267,9 @@ public class PostServiceImpl implements PostService {
                 ),
                 imageDtos,
                 likeCount,
-                liked
+                liked,
+                commentCount
+
         );
     }
 

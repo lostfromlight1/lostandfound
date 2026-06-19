@@ -11,6 +11,8 @@ import java.util.List;
 @Repository
 public interface CommentRepository extends JpaRepository<Comment, Long> {
 
+    long countByPostIdAndDeletedAtIsNull(Long postId);
+
     @Query("""
         SELECT c FROM Comment c
         JOIN FETCH c.user u
