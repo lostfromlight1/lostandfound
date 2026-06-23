@@ -39,3 +39,4 @@ public class PostResponse {
   public record ImageDto(Long id, String url, Integer sortOrder) {}
 }
 
+
