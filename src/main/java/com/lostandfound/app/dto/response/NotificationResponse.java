@@ -60,6 +60,9 @@ public class NotificationResponse {
             NotificationType type,
             NotificationStatus status,
             String title,
+            Long postId,
+            Long commentId,
+            Long replyId,
             LocalDateTime createdAt
     ) {
         public static NotificationSummary fromEntity(Notification notification) {
@@ -70,6 +73,9 @@ public class NotificationResponse {
                     .type(notification.getType())
                     .status(notification.getStatus())
                     .title(notification.getTitle())
+                    .postId(notification.getPostId())
+                    .commentId(notification.getCommentId())
+                    .replyId(notification.getReplyId())
                     .createdAt(notification.getCreatedAt())
                     .build();
         }

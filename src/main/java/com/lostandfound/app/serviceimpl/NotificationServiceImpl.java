@@ -363,7 +363,7 @@ public class NotificationServiceImpl implements NotificationService {
 
         if (recipientId == null) return;
 
-        String title = likerName + " liked your post";
+        String title = likerName + " helped your post";
         String message = "Your post is getting attention";
 
         createNotification(new NotificationRequest.InternalNotificationRequest(
